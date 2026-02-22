@@ -1,0 +1,105 @@
+﻿@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Http
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["WatchList0.1.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet @rendermode="PageRenderMode" />
+</head>
+
+<body>
+    <Routes @rendermode="PageRenderMode" />
+    <script>
+        (function () {
+            const key = "watchlyst.spotlightEnabled";
+
+            function getSpotlightEnabled() {
+                let enabled = true;
+                try {
+                    const raw = localStorage.getItem(key);
+                    enabled = raw === null ? true : raw === "true";
+                } catch {
+                    enabled = true;
+                }
+                return enabled;
+            }
+
+            function applySpotlightState(enabled) {
+                document.body.classList.toggle("plain-background", !enabled);
+
+                const contents = document.querySelectorAll(".content");
+                contents.forEach((el) => {
+                    el.classList.toggle("spotlight-off", !enabled);
+                });
+
+                const toggle = document.getElementById("spotlight-toggle");
+                if (toggle) {
+                    toggle.checked = enabled;
+                }
+            }
+
+            window.watchlystApplySpotlightSetting = function () {
+                const enabled = getSpotlightEnabled();
+                applySpotlightState(enabled);
+            };
+
+            window.watchlystSetSpotlight = function (enabled) {
+                try {
+                    localStorage.setItem(key, enabled ? "true" : "false");
+                } catch {
+                }
+
+                applySpotlightState(enabled);
+            };
+
+            if (!window.watchlystSpotlightTrackingBound) {
+                window.watchlystSpotlightTrackingBound = true;
+                window.addEventListener("mousemove", function (event) {
+                    const contents = document.querySelectorAll(".content");
+                    contents.forEach((el) => {
+                        const rect = el.getBoundingClientRect();
+                        el.style.setProperty("--mx", (event.clientX - rect.left) + "px");
+                        el.style.setProperty("--my", (event.clientY - rect.top) + "px");
+                    });
+                });
+            }
+
+            if (!window.watchlystSpotlightObserverBound) {
+                window.watchlystSpotlightObserverBound = true;
+                const observer = new MutationObserver(function () {
+                    window.watchlystApplySpotlightSetting();
+                });
+                observer.observe(document.documentElement, { childList: true, subtree: true });
+            }
+
+            document.addEventListener("DOMContentLoaded", window.watchlystApplySpotlightSetting);
+            window.addEventListener("load", window.watchlystApplySpotlightSetting);
+            window.addEventListener("pageshow", window.watchlystApplySpotlightSetting);
+            document.addEventListener("enhancedload", window.watchlystApplySpotlightSetting);
+            window.watchlystApplySpotlightSetting();
+            requestAnimationFrame(window.watchlystApplySpotlightSetting);
+            setTimeout(window.watchlystApplySpotlightSetting, 150);
+        })();
+    </script>
+    <script src="_framework/blazor.web.js"></script>
+</body>
+
+</html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private IComponentRenderMode? PageRenderMode =>
+        HttpContext.AcceptsInteractiveRouting() ? InteractiveServer : null;
+}

@@ -1,0 +1,483 @@
+@page "/settings"
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.EntityFrameworkCore
+@using WatchList0._1.Data
+
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApplicationDbContext Db
+@inject NavigationManager Navigation
+
+<span style="display: flex; flex-direction: column; align-items: center; margin-top: 10px;">
+<AuthorizeView>
+    <NotAuthorized>
+        <h1>Please sign in!</h1>
+        <a class="btn btn-primary" href="/signin" data-enhance-nav="false" style="margin-top: 20px;">Sign In</a>
+    </NotAuthorized>
+    <Authorized>
+        @if (listName is null)
+        {
+            <h3>Loading settings...</h3>
+        }
+        else if (string.IsNullOrWhiteSpace(listName))
+        {
+            <h3>List not found.</h3>
+        }
+        else
+        {
+            <span style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; width: 100%;">
+                <NavLink class="nav-link" href="@($"/?listId={ListId}")" style="justify-self: start;">
+                    <button class="btn btn-primary" type="button">
+                        <span class="bi bi-arrow-left" style="vertical-align: top;"></span> Back
+                    </button> 
+                </NavLink>
+                <div style="margin: 0; display: flex; flex-direction: column; align-items: center; width: 600px;">
+                    @if (canManageList)
+                    {
+                        <form @onsubmit="SaveNameFromUiAsync" @onsubmit:preventDefault="true" style="margin: 0; display: flex; flex-direction: row; align-items: center; width: 50%; gap: 10px;">
+                            <input type="text" class="form-control" @bind="editedListName" maxlength="10" required
+                                   style="font-size: 1.75rem; font-weight: 500; text-align: center; padding-top: 0px; padding-bottom: 0px; padding-left: 0px; padding-right: 0px; width: 100%;" />
+                            <button class="btn btn-primary" type="submit" style="justify-self: end;"><span class="bi bi-check-lg" style="vertical-align: top;"></span></button>
+                        </form>
+
+                        <div style="margin-top: 20px; width: 100%; border: 1px solid currentColor; border-radius: 5px; padding: 12px;">
+                            <h5 style="margin: 0 0 10px 0;">Share Watchlist</h5>
+                            <form @onsubmit="AddSharedUserAsync" @onsubmit:preventDefault="true" style="display: flex; gap: 8px;">
+                                <input type="text" class="form-control" @bind="shareUsername" placeholder="Username" required />
+                                <button class="btn btn-primary" type="submit" title="Send invite" aria-label="Send invite" style="background-color: green; border-color: green;">
+                                    <span class="bi bi-plus-lg" style="vertical-align: top;"></span>
+                                </button>
+                            </form>
+
+                            @if (!string.IsNullOrWhiteSpace(shareErrorMessage))
+                            {
+                                <div class="alert alert-danger" style="margin-top: 10px; margin-bottom: 0;">@shareErrorMessage</div>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(shareSuccessMessage))
+                            {
+                                <div class="alert alert-success" style="margin-top: 10px; margin-bottom: 0;">@shareSuccessMessage</div>
+                            }
+
+                            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                                @if (sharedWithUsernames.Count == 0)
+                                {
+                                    <span>No shared users yet.</span>
+                                }
+                                else
+                                {
+                                    @foreach (var username in sharedWithUsernames)
+                                    {
+                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                                            <span>@username</span>
+                                            <button class="btn btn-outline-danger btn-sm" type="button" @onclick="(() => RemoveSharedUserAsync(username))">Remove</button>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                    else if (hasPendingInvite)
+                    {
+                        <h3 style="margin: 0;">@listName</h3>
+                        <h5 style="margin-top: 20px;">This watchlist has been shared with you by @sharedByUsername.</h5>
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button class="btn btn-primary" type="button" @onclick="AcceptShareInviteAsync">Accept</button>
+                            <button class="btn btn-outline-danger" type="button" @onclick="DeclineShareInviteAsync">Decline</button>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(shareErrorMessage))
+                        {
+                            <div class="alert alert-danger" style="margin-top: 10px; margin-bottom: 0;">@shareErrorMessage</div>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(shareSuccessMessage))
+                        {
+                            <div class="alert alert-success" style="margin-top: 10px; margin-bottom: 0;">@shareSuccessMessage</div>
+                        }
+                    }
+                    else
+                    {
+                        <h3 style="margin: 0;">@listName</h3>
+                        <h5 style="margin-top: 20px;">This list is shared with you by @sharedByUsername.</h5>
+                    }
+                </div>
+                @if (canManageList || hasSharedAccess)
+                {
+                    <NavLink class="nav-link" href="@($"/delete?listId={ListId}")" style="justify-self: end;">
+                        <span class="bi bi-trash-fill" style="scale: 1.5; color: red; margin-top: 10px;" title="@(canManageList ? "Delete list" : "Leave shared list")"></span>
+                    </NavLink>
+                }
+                else
+                {
+                    <span></span>
+                }
+            </span>
+        }
+    </Authorized>
+</AuthorizeView>
+</span>
+
+@code {
+    [SupplyParameterFromQuery(Name = "listId")]
+    public int? ListId { get; set; }
+
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    private string? listName;
+    private string sharedByUsername = string.Empty;
+    private string editedListName = string.Empty;
+    private bool canManageList;
+    private bool hasSharedAccess;
+    private bool hasPendingInvite;
+    private string shareUsername = string.Empty;
+    private string shareErrorMessage = string.Empty;
+    private string shareSuccessMessage = string.Empty;
+    private readonly List<string> sharedWithUsernames = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext?.Request.Method == "POST")
+        {
+            await SaveNameFromPostAsync();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            listName = string.Empty;
+            return;
+        }
+
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId) || ListId is null)
+        {
+            listName = string.Empty;
+            sharedByUsername = string.Empty;
+            canManageList = false;
+            hasSharedAccess = false;
+            hasPendingInvite = false;
+            sharedWithUsernames.Clear();
+            return;
+        }
+
+        var listDetails = await Db.WatchLists
+            .Include(w => w.User)
+            .Include(w => w.SharedWithUsers)
+            .Include(w => w.ShareInvitations)
+            .FirstOrDefaultAsync(w => w.Id == ListId.Value &&
+                (w.UserId == userId || w.SharedWithUsers.Any(u => u.Id == userId) || w.ShareInvitations.Any(i => i.UserId == userId)));
+
+        if (listDetails is null)
+        {
+            listName = string.Empty;
+            sharedByUsername = string.Empty;
+            canManageList = false;
+            hasSharedAccess = false;
+            hasPendingInvite = false;
+            sharedWithUsernames.Clear();
+            return;
+        }
+
+        listName = string.IsNullOrWhiteSpace(listDetails.Name) ? "New List" : listDetails.Name;
+        editedListName = listName;
+        canManageList = listDetails.UserId == userId;
+        sharedByUsername = canManageList
+            ? string.Empty
+            : (listDetails.User?.Username ?? "Unknown user");
+        hasSharedAccess = !canManageList && listDetails.SharedWithUsers.Any(u => u.Id == userId);
+        hasPendingInvite = !canManageList
+            && !hasSharedAccess
+            && listDetails.ShareInvitations.Any(i => i.UserId == userId);
+
+        sharedWithUsernames.Clear();
+        sharedWithUsernames.AddRange(listDetails.SharedWithUsers.Select(u => u.Username).OrderBy(username => username));
+    }
+
+    private async Task SaveNameFromPostAsync()
+    {
+        if (HttpContext is null || ListId is null)
+        {
+            return;
+        }
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        var form = await HttpContext.Request.ReadFormAsync();
+        var newName = form["listName"].ToString().Trim();
+        await SaveNameAsync(userId, newName, redirectToHome: true);
+    }
+
+    private async Task SaveNameFromUiAsync()
+    {
+        if (ListId is null)
+        {
+            return;
+        }
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        await SaveNameAsync(userId, editedListName, redirectToHome: true);
+    }
+
+    private async Task SaveNameAsync(string userId, string newNameValue, bool redirectToHome)
+    {
+        if (ListId is null)
+        {
+            return;
+        }
+
+        var newName = newNameValue.Trim();
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            return;
+        }
+
+        if (newName.Length > 10)
+        {
+            newName = newName[..10];
+        }
+
+        var list = await Db.WatchLists
+            .FirstOrDefaultAsync(w => w.UserId == userId && w.Id == ListId.Value);
+        if (list is null)
+        {
+            return;
+        }
+
+        list.Name = newName;
+        await Db.SaveChangesAsync();
+        listName = newName;
+        editedListName = newName;
+
+        if (redirectToHome)
+        {
+            Navigation.NavigateTo($"/?listId={ListId}", forceLoad: true);
+        }
+    }
+
+    private async Task AddSharedUserAsync()
+    {
+        if (ListId is null)
+        {
+            return;
+        }
+
+        shareErrorMessage = string.Empty;
+        shareSuccessMessage = string.Empty;
+
+        var usernameToShare = shareUsername.Trim();
+        if (string.IsNullOrWhiteSpace(usernameToShare))
+        {
+            return;
+        }
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var currentUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            shareErrorMessage = "You must be signed in.";
+            return;
+        }
+
+        var list = await Db.WatchLists
+            .Include(w => w.SharedWithUsers)
+            .Include(w => w.ShareInvitations)
+            .FirstOrDefaultAsync(w => w.Id == ListId.Value && w.UserId == currentUserId);
+        if (list is null)
+        {
+            shareErrorMessage = "Only the owner can share this watchlist.";
+            return;
+        }
+
+        var targetUser = await Db.Users
+            .FirstOrDefaultAsync(u => u.Username == usernameToShare);
+        if (targetUser is null)
+        {
+            shareErrorMessage = "User not found.";
+            return;
+        }
+
+        if (targetUser.Id == currentUserId)
+        {
+            shareErrorMessage = "You already own this watchlist.";
+            return;
+        }
+
+        if (list.SharedWithUsers.Any(u => u.Id == targetUser.Id))
+        {
+            shareErrorMessage = "This user already has access.";
+            return;
+        }
+
+        if (list.ShareInvitations.Any(i => i.UserId == targetUser.Id))
+        {
+            shareErrorMessage = "This user already has a pending invite.";
+            return;
+        }
+
+        list.ShareInvitations.Add(new WatchListShareInvitationEntity
+        {
+            UserId = targetUser.Id,
+            WatchListId = list.Id
+        });
+        await Db.SaveChangesAsync();
+
+        shareUsername = string.Empty;
+        shareSuccessMessage = $"Invite sent to {targetUser.Username}.";
+        await OnParametersSetAsync();
+    }
+
+    private async Task RemoveSharedUserAsync(string username)
+    {
+        if (ListId is null)
+        {
+            return;
+        }
+
+        shareErrorMessage = string.Empty;
+        shareSuccessMessage = string.Empty;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var currentUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            shareErrorMessage = "You must be signed in.";
+            return;
+        }
+
+        var list = await Db.WatchLists
+            .Include(w => w.SharedWithUsers)
+            .Include(w => w.ShareInvitations)
+            .FirstOrDefaultAsync(w => w.Id == ListId.Value && w.UserId == currentUserId);
+        if (list is null)
+        {
+            shareErrorMessage = "Only the owner can update sharing.";
+            return;
+        }
+
+        var sharedUser = list.SharedWithUsers.FirstOrDefault(u => u.Username == username);
+        if (sharedUser is null)
+        {
+            return;
+        }
+
+        list.SharedWithUsers.Remove(sharedUser);
+
+        var pendingInvite = list.ShareInvitations.FirstOrDefault(i => i.UserId == sharedUser.Id);
+        if (pendingInvite is not null)
+        {
+            list.ShareInvitations.Remove(pendingInvite);
+        }
+
+        await Db.SaveChangesAsync();
+
+        shareSuccessMessage = $"Removed {username}.";
+        await OnParametersSetAsync();
+    }
+
+    private async Task AcceptShareInviteAsync()
+    {
+        if (ListId is null)
+        {
+            return;
+        }
+
+        shareErrorMessage = string.Empty;
+        shareSuccessMessage = string.Empty;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            shareErrorMessage = "You must be signed in.";
+            return;
+        }
+
+        var list = await Db.WatchLists
+            .Include(w => w.SharedWithUsers)
+            .Include(w => w.ShareInvitations)
+            .FirstOrDefaultAsync(w => w.Id == ListId.Value);
+        if (list is null)
+        {
+            shareErrorMessage = "List not found.";
+            return;
+        }
+
+        var invite = list.ShareInvitations.FirstOrDefault(i => i.UserId == userId);
+        if (invite is null)
+        {
+            shareErrorMessage = "No pending invite found.";
+            return;
+        }
+
+        var currentUser = await Db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (currentUser is null)
+        {
+            shareErrorMessage = "User not found.";
+            return;
+        }
+
+        if (!list.SharedWithUsers.Any(u => u.Id == userId))
+        {
+            list.SharedWithUsers.Add(currentUser);
+        }
+
+        list.ShareInvitations.Remove(invite);
+        await Db.SaveChangesAsync();
+
+        shareSuccessMessage = "You now have access to this shared list.";
+        await OnParametersSetAsync();
+    }
+
+    private async Task DeclineShareInviteAsync()
+    {
+        if (ListId is null)
+        {
+            return;
+        }
+
+        shareErrorMessage = string.Empty;
+        shareSuccessMessage = string.Empty;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            shareErrorMessage = "You must be signed in.";
+            return;
+        }
+
+        var invite = await Db.WatchListShareInvitations
+            .FirstOrDefaultAsync(i => i.WatchListId == ListId.Value && i.UserId == userId);
+        if (invite is null)
+        {
+            shareErrorMessage = "No pending invite found.";
+            return;
+        }
+
+        Db.WatchListShareInvitations.Remove(invite);
+        await Db.SaveChangesAsync();
+
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

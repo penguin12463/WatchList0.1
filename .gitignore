@@ -1,0 +1,18 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# macOS
+.DS_Store
+
+# SQLite local data
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log

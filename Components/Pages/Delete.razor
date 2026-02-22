@@ -1,0 +1,68 @@
+@page "/delete"
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using WatchList0._1.Data
+
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApplicationDbContext Db
+@inject NavigationManager Navigation
+
+@code {
+    [SupplyParameterFromQuery(Name = "listId")]
+    public int? ListId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId) || ListId is null)
+        {
+            return;
+        }
+
+        var list = await Db.WatchLists
+            .Include(w => w.SharedWithUsers)
+            .FirstOrDefaultAsync(w => w.Id == ListId.Value);
+        if (list is null)
+        {
+            return;
+        }
+
+        if (list.UserId == userId)
+        {
+            Db.WatchLists.Remove(list);
+            await Db.SaveChangesAsync();
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        var sharedUser = list.SharedWithUsers.FirstOrDefault(u => u.Id == userId);
+        if (sharedUser is not null)
+        {
+            list.SharedWithUsers.Remove(sharedUser);
+            await Db.SaveChangesAsync();
+            Navigation.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        var invite = await Db.WatchListShareInvitations
+            .FirstOrDefaultAsync(i => i.WatchListId == ListId.Value && i.UserId == userId);
+        if (invite is not null)
+        {
+            Db.WatchListShareInvitations.Remove(invite);
+            await Db.SaveChangesAsync();
+        }
+
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

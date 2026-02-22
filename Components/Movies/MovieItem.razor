@@ -1,0 +1,175 @@
+@using WatchList0._1.Components.Layout
+@using WatchList0._1.Data
+
+<div class="movie-item" style="display: flex; flex-direction: row; align-items: center; gap: 5px; padding: 5px 10px; margin: 0px;">
+    <span class="bi bi-circle-fill" style="scale: 0.5; vertical-align: top;"></span>
+    @if (!isEditing)
+    {
+        <span class="movie-title">@Movie.Title</span>
+        <span style="color: #000; font-size: 0.95em;">
+            @if (!string.IsNullOrWhiteSpace(Movie.MediaType))
+            {
+                if (Movie.MediaType == "movie" && Movie.Runtime is not null)
+                {
+                    <span>- <img src="/images/clapperboard.png" loading="lazy" style="width: auto; height: 1.1em; vertical-align: middle;"> - @(Movie.WatchedRuntime ?? 0)/@Movie.Runtime min</span>
+                }
+                else if (Movie.MediaType == "tv" && Movie.NumberOfEpisodes is not null)
+                {
+                    <span>- <img src="/images/episodes.png" loading="lazy" style="width: auto; height: 1.1em; vertical-align: middle;"> - @(Movie.WatchedEpisodes ?? 0)/@Movie.NumberOfEpisodes episodes</span>
+                }
+                else if (Movie.MediaType == "movie")
+                {
+                    <span>- <img src="/images/clapperboard.png" loading="lazy" style="width: auto; height: 1.1em; vertical-align: middle;"> - Length Not Found</span>
+                }
+                else if (Movie.MediaType == "tv")
+                {
+                    <span>- <img src="/images/episodes.png" loading="lazy" style="width: auto; height: 1.1em; vertical-align: middle;"> - Length Not Found</span>
+                }
+            }
+            else
+            {
+                <span>- Type and length unknown</span>
+            }
+        </span>
+        @if (Movie.Rating is >= 1 and <= 5)
+        {
+            <span style="color: #000; font-size: 0.95em;">- @GetRatingStars(Movie.Rating.Value)</span>
+        }
+        <button class="btn btn-link nav-link movie-item-edit-button" type="button" style="margin-left: auto;" @onclick="BeginEdit">
+            <span class="bi bi-pen-fill" style="vertical-align: top; scale: 1; color: #60a5fa; text-shadow: -1px 0 #000, 0 1px #000, 1px 0 #000, 0 -1px #000;"></span>
+        </button>
+    }
+    else
+    {
+        <div style="display: flex; align-items: center; gap: 8px; width: 100%; flex-wrap: nowrap;">
+            <input class="form-control" type="text" @bind="editTitle" maxlength="80" placeholder="Title" style="width: 140px; min-width: 140px; flex: 0 0 140px; padding: 0 5px 0 5px; " />
+            <select class="form-select" @bind="editMediaType" style="width: auto; min-width: 110px; padding: 0 5px 0 5px;">
+                <option value="">Unknown</option>
+                <option value="movie">Movie</option>
+                <option value="tv">TV</option>
+            </select>
+
+            @if (editMediaType == "movie")
+            {
+                <input class="form-control" type="number" min="0" @bind="editWatchedRuntime" placeholder="Watched" style="width: 110px; padding: 0 5px 0 5px;" />
+                <span>/</span>
+                <input class="form-control" type="number" min="1" @bind="editRuntime" placeholder="Total min" style="width: 110px; padding: 0 5px 0 5px;" />
+            }
+            else if (editMediaType == "tv")
+            {
+                <input class="form-control" type="number" min="0" @bind="editWatchedEpisodes" placeholder="Watched" style="width: 110px; padding: 0 5px 0 5px;" />
+                <span>/</span>
+                <input class="form-control" type="number" min="1" @bind="editNumberOfEpisodes" placeholder="Total eps" style="width: 110px; padding: 0 5px 0 5px;" />
+            }
+
+            <select class="form-select" @bind="editRating" style="width: auto; min-width: 100px; padding: 0 5px 0 5px;">
+                <option value="">No rating</option>
+                <option value="1">★☆☆☆☆</option>
+                <option value="2">★★☆☆☆</option>
+                <option value="3">★★★☆☆</option>
+                <option value="4">★★★★☆</option>
+                <option value="5">★★★★★</option>
+            </select>
+
+            <button class="btn btn-primary" type="button" @onclick="SaveEditAsync" style="padding: 0 5px 0 5px;">
+                <span class="bi bi-check-lg" style="vertical-align: top;"></span>
+            </button>
+            <button class="btn btn-outline-secondary" type="button" @onclick="CancelEdit" style="padding: 0 5px 0 5px;">
+                <span class="bi bi-x-lg" style="vertical-align: top;"></span>
+            </button>
+            <button class="btn btn-primary" type="button" @onclick="DeleteMovieAsync" style="padding: 0 5px 0 5px; background-color: red;">
+                <span class="bi bi-trash" style="vertical-align: top; color: white;"></span>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public MovieEntity Movie { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<MovieEditRequest> OnSaveEdit { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnDeleteMovie { get; set; }
+
+    private bool isEditing;
+    private string editTitle = string.Empty;
+    private string? editMediaType;
+    private int? editRuntime;
+    private int? editWatchedRuntime;
+    private int? editNumberOfEpisodes;
+    private int? editWatchedEpisodes;
+    private int? editRating;
+    private int boundMovieId;
+
+    protected override void OnParametersSet()
+    {
+        if (Movie.Id != boundMovieId)
+        {
+            boundMovieId = Movie.Id;
+            isEditing = false;
+            editTitle = Movie.Title;
+            editMediaType = Movie.MediaType;
+            editRuntime = Movie.Runtime;
+            editWatchedRuntime = Movie.WatchedRuntime;
+            editNumberOfEpisodes = Movie.NumberOfEpisodes;
+            editWatchedEpisodes = Movie.WatchedEpisodes;
+            editRating = Movie.Rating;
+        }
+    }
+
+    private void BeginEdit()
+    {
+        isEditing = true;
+        editTitle = Movie.Title;
+        editMediaType = Movie.MediaType;
+        editRuntime = Movie.Runtime;
+        editWatchedRuntime = Movie.WatchedRuntime;
+        editNumberOfEpisodes = Movie.NumberOfEpisodes;
+        editWatchedEpisodes = Movie.WatchedEpisodes;
+        editRating = Movie.Rating;
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        var trimmedTitle = editTitle.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedTitle))
+        {
+            return;
+        }
+
+        var request = new MovieEditRequest
+        {
+            MovieId = Movie.Id,
+            Title = trimmedTitle,
+            MediaType = string.IsNullOrWhiteSpace(editMediaType) ? null : editMediaType,
+            Runtime = editMediaType == "movie" ? editRuntime : null,
+            WatchedRuntime = editMediaType == "movie" ? editWatchedRuntime : null,
+            NumberOfEpisodes = editMediaType == "tv" ? editNumberOfEpisodes : null,
+            WatchedEpisodes = editMediaType == "tv" ? editWatchedEpisodes : null,
+            Rating = editRating
+        };
+
+        await OnSaveEdit.InvokeAsync(request);
+        isEditing = false;
+    }
+
+    private async Task DeleteMovieAsync()
+    {
+        await OnDeleteMovie.InvokeAsync(Movie.Id);
+        isEditing = false;
+    }
+
+    private static string GetRatingStars(int rating)
+    {
+        var clamped = Math.Clamp(rating, 1, 5);
+        return new string('★', clamped) + new string('☆', 5 - clamped);
+    }
+}

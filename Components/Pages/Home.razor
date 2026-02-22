@@ -1,0 +1,458 @@
+﻿@page "/"
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.EntityFrameworkCore
+@using WatchList0._1.Data
+@using WatchList0._1.Services
+@using WatchList0._1.Components.Movies
+
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApplicationDbContext Db
+
+<span style="display: flex; flex-direction: column; align-items: center; margin-top: 10px;">
+<AuthorizeView>
+    <NotAuthorized>
+        <img src="/images/person.png" loading="lazy" style="width: 100px; height: 100px; margin-bottom: 10px; margin-top: 40px;"/>
+        <h1>Please sign in!</h1>
+        <a class="btn btn-primary" href="/signin" data-enhance-nav="false" style="margin-top: 20px; color: white;">Sign In</a>
+    </NotAuthorized>
+    <Authorized>
+        @if (!string.IsNullOrWhiteSpace(selectedListName))
+        {
+            <span style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; width: 100%;">
+                <NavLink class="nav-link" href="@($"/settings?listId={ListId}")" style="justify-self: start;">
+                    <span class="bi bi-gear-fill" style="vertical-align: top; scale: 1.5;"></span>
+                </NavLink>
+                <h3 style="margin: 0; text-align: center;">@selectedListName</h3>
+                <span></span>
+            </span>
+
+            <div style="margin-top: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; gap: 10px;">
+                @if (hasMovies is null)
+                {
+                    <h4>Loading watchlist...</h4>
+                }
+                else if (hasMovies == false)
+                {
+                    <h4>This list has no movies yet.</h4>
+                }
+                else
+                {
+                    <div style="display: flex; flex-direction: column; gap: 0; align-items: stretch; padding: 0px; border: 1px solid currentColor; border-radius: 5px; width: 100%; max-width: 800px; margin: 0 auto;">
+                        @foreach (var movie in movies)
+                        {
+                            <MovieItem @key="(ListId, movie.Id)" Movie="movie" OnSaveEdit="SaveMovieEditsAsync" OnDeleteMovie="DeleteMovieFromListAsync" />
+                        }
+                    </div>
+                }
+
+                <form @onsubmit="AddMovieFromUiAsync" @onsubmit:preventDefault="true" style="width: 100%; max-width: 800px; margin: 0 auto;">
+                    <div style="display: flex; flex-direction: row; align-items: center; gap: 10px; width: 100%;">
+                        <button class="btn btn-primary" type="submit" style="padding: 0.25rem 0.5rem;"><span class="bi bi-plus-circle-fill" style="vertical-align: top;"></span></button>
+                        <input type="text"
+                               class="form-control"
+                               @bind="newMovieTitle"
+                               maxlength="80"
+                               placeholder="Add a movie..."
+                               required
+                               style="flex: 1 1 0%; min-width: 0;" />
+                    </div>
+                </form>
+            </div>
+        }
+        else{
+            <h1 style="margin-top: 40px;">Welcome, @context.User.Identity?.Name!</h1>
+            @if (hasWatchLists is null)
+            {
+                <h3>Finding your watchlists...</h3>
+            }
+            else if (hasWatchLists == false)
+            {
+                <h3>Make a new list to get started!</h3>
+            }
+            else
+            {
+                <h3>Select a watchlist or create a new one to continue.</h3>
+            }
+        }
+    </Authorized>
+</AuthorizeView>
+</span>
+
+@code{
+    [SupplyParameterFromQuery(Name = "listId")]
+    public int? ListId { get; set; }
+
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    private bool? hasWatchLists;
+    private string? selectedListName;
+    private bool? hasMovies;
+    private string newMovieTitle = string.Empty;
+    private readonly List<MovieEntity> movies = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext?.Request.Method == "POST")
+        {
+            await AddMovieAsync();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            hasWatchLists = null;
+            selectedListName = null;
+            hasMovies = null;
+            movies.Clear();
+            return;
+        }
+
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            hasWatchLists = false;
+            selectedListName = null;
+            hasMovies = null;
+            movies.Clear();
+            return;
+        }
+
+        hasWatchLists = await Db.WatchLists
+            .AnyAsync(w => w.UserId == userId || w.SharedWithUsers.Any(u => u.Id == userId));
+
+        if (ListId is null)
+        {
+            selectedListName = null;
+            hasMovies = null;
+            movies.Clear();
+            return;
+        }
+
+        var list = await Db.WatchLists
+            .Where(w => w.Id == ListId.Value && (w.UserId == userId || w.SharedWithUsers.Any(u => u.Id == userId)))
+            .Select(w => new { w.Name })
+            .FirstOrDefaultAsync();
+
+        if (list is null)
+        {
+            selectedListName = null;
+            hasMovies = null;
+            movies.Clear();
+            return;
+        }
+
+        selectedListName = string.IsNullOrWhiteSpace(list.Name) ? "New List" : list.Name;
+
+        movies.Clear();
+        movies.AddRange(await Db.WatchLists
+            .Where(w => w.Id == ListId.Value && (w.UserId == userId || w.SharedWithUsers.Any(u => u.Id == userId)))
+            .SelectMany(w => w.Movies)
+            .OrderBy(m => m.Title)
+            .ToListAsync());
+
+        hasMovies = movies.Count > 0;
+    }
+
+    [Inject]
+    private TmdbService Tmdb { get; set; } = default!;
+
+    private async Task AddMovieAsync()
+    {
+        if (HttpContext is null)
+        {
+            return;
+        }
+
+        var form = await HttpContext.Request.ReadFormAsync();
+        var title = form["movieTitle"].ToString().Trim();
+        await AddMovieByTitleAsync(title, redirectAfterSave: true);
+    }
+
+    private async Task AddMovieFromUiAsync()
+    {
+        var title = newMovieTitle.Trim();
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return;
+        }
+
+        await AddMovieByTitleAsync(title, redirectAfterSave: false);
+        newMovieTitle = string.Empty;
+        await OnParametersSetAsync();
+    }
+
+    private async Task AddMovieByTitleAsync(string title, bool redirectAfterSave)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return;
+        }
+
+        if (title.Length > 80)
+        {
+            title = title[..80];
+        }
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId) || ListId is null)
+        {
+            return;
+        }
+
+        var listExists = await Db.WatchLists
+            .AnyAsync(w => w.Id == ListId.Value && (w.UserId == userId || w.SharedWithUsers.Any(u => u.Id == userId)));
+        if (!listExists)
+        {
+            return;
+        }
+
+        var watchList = await Db.WatchLists
+            .Include(w => w.Movies)
+            .FirstOrDefaultAsync(w => w.Id == ListId.Value && (w.UserId == userId || w.SharedWithUsers.Any(u => u.Id == userId)));
+        if (watchList is null)
+        {
+            return;
+        }
+
+        // Check if movie already exists in DB (by title, case-insensitive)
+        var existing = await Db.Movies
+            .Where(m => m.Title.ToLower() == title.ToLower())
+            .OrderByDescending(m => m.TmdbId != null) // Prefer TMDB data if available
+            .FirstOrDefaultAsync();
+        if (existing != null)
+        {
+            if (!watchList.Movies.Any(m => m.Id == existing.Id))
+            {
+                watchList.Movies.Add(existing);
+                await Db.SaveChangesAsync();
+            }
+            if (redirectAfterSave && HttpContext is not null)
+            {
+                HttpContext.Response.Redirect($"/?listId={ListId}");
+            }
+            return;
+        }
+
+        // Search TMDB for the entered title
+        var search = await Tmdb.SearchAsync(title);
+        var best = search?.Results.FirstOrDefault();
+        if (best == null)
+        {
+            var plainMovie = new MovieEntity
+            {
+                Title = title
+            };
+
+            watchList.Movies.Add(plainMovie);
+            await Db.SaveChangesAsync();
+            if (redirectAfterSave && HttpContext is not null)
+            {
+                HttpContext.Response.Redirect($"/?listId={ListId}");
+            }
+            return;
+        }
+
+        string mediaType = best.MediaType;
+        string movieTitle = best.Title ?? best.Name ?? title;
+        int? runtime = null;
+        int? numberOfEpisodes = null;
+
+        var sharedMovie = await Db.Movies.FirstOrDefaultAsync(m => m.MediaType == mediaType && m.TmdbId == best.Id);
+        if (sharedMovie != null)
+        {
+            if (!watchList.Movies.Any(m => m.Id == sharedMovie.Id))
+            {
+                watchList.Movies.Add(sharedMovie);
+                await Db.SaveChangesAsync();
+            }
+
+            if (redirectAfterSave && HttpContext is not null)
+            {
+                HttpContext.Response.Redirect($"/?listId={ListId}");
+            }
+            return;
+        }
+
+        if (mediaType == "movie")
+        {
+            var details = await Tmdb.GetMovieDetailsAsync(best.Id);
+            runtime = details?.Runtime;
+        }
+        else if (mediaType == "tv")
+        {
+            var details = await Tmdb.GetTvDetailsAsync(best.Id);
+            numberOfEpisodes = details?.NumberOfEpisodes;
+        }
+
+        var movie = new MovieEntity
+        {
+            Title = movieTitle,
+            MediaType = mediaType,
+            TmdbId = best.Id,
+            Runtime = runtime,
+            WatchedRuntime = runtime is not null ? 0 : null,
+            NumberOfEpisodes = numberOfEpisodes,
+            WatchedEpisodes = numberOfEpisodes is not null ? 0 : null
+        };
+
+        watchList.Movies.Add(movie);
+
+        await Db.SaveChangesAsync();
+        if (redirectAfterSave && HttpContext is not null)
+        {
+            HttpContext.Response.Redirect($"/?listId={ListId}");
+        }
+    }
+
+    private async Task SaveMovieEditsAsync(MovieEditRequest request)
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId) || ListId is null)
+        {
+            return;
+        }
+
+        var watchList = await Db.WatchLists
+            .Include(w => w.Movies)
+            .FirstOrDefaultAsync(w => w.Id == ListId.Value && (w.UserId == userId || w.SharedWithUsers.Any(u => u.Id == userId)));
+        if (watchList is null)
+        {
+            return;
+        }
+
+        var existingMovie = watchList.Movies.FirstOrDefault(m => m.Id == request.MovieId);
+        if (existingMovie is null)
+        {
+            return;
+        }
+
+        var normalizedTitle = request.Title.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedTitle))
+        {
+            return;
+        }
+
+        if (normalizedTitle.Length > 80)
+        {
+            normalizedTitle = normalizedTitle[..80];
+        }
+
+        var watchListCountForMovie = await Db.WatchLists
+            .CountAsync(w => w.Movies.Any(m => m.Id == existingMovie.Id));
+
+        if (watchListCountForMovie > 1)
+        {
+            var runtime = request.MediaType == "movie" ? request.Runtime : null;
+            var watchedRuntime = request.MediaType == "movie" ? request.WatchedRuntime : null;
+            if (runtime is not null)
+            {
+                watchedRuntime = Math.Clamp(watchedRuntime ?? 0, 0, runtime.Value);
+            }
+
+            var episodes = request.MediaType == "tv" ? request.NumberOfEpisodes : null;
+            var watchedEpisodes = request.MediaType == "tv" ? request.WatchedEpisodes : null;
+            if (episodes is not null)
+            {
+                watchedEpisodes = Math.Clamp(watchedEpisodes ?? 0, 0, episodes.Value);
+            }
+
+            int? rating = request.Rating;
+            if (rating is not null)
+            {
+                rating = Math.Clamp(rating.Value, 1, 5);
+            }
+
+            var listSpecificMovie = new MovieEntity
+            {
+                Title = normalizedTitle,
+                MediaType = request.MediaType,
+                Runtime = runtime,
+                WatchedRuntime = watchedRuntime,
+                NumberOfEpisodes = episodes,
+                WatchedEpisodes = watchedEpisodes,
+                Rating = rating,
+                TmdbId = null
+            };
+
+            watchList.Movies.Remove(existingMovie);
+            watchList.Movies.Add(listSpecificMovie);
+        }
+        else
+        {
+            var runtime = request.MediaType == "movie" ? request.Runtime : null;
+            var watchedRuntime = request.MediaType == "movie" ? request.WatchedRuntime : null;
+            if (runtime is not null)
+            {
+                watchedRuntime = Math.Clamp(watchedRuntime ?? 0, 0, runtime.Value);
+            }
+
+            var episodes = request.MediaType == "tv" ? request.NumberOfEpisodes : null;
+            var watchedEpisodes = request.MediaType == "tv" ? request.WatchedEpisodes : null;
+            if (episodes is not null)
+            {
+                watchedEpisodes = Math.Clamp(watchedEpisodes ?? 0, 0, episodes.Value);
+            }
+
+            int? rating = request.Rating;
+            if (rating is not null)
+            {
+                rating = Math.Clamp(rating.Value, 1, 5);
+            }
+
+            existingMovie.Title = normalizedTitle;
+            existingMovie.MediaType = request.MediaType;
+            existingMovie.Runtime = runtime;
+            existingMovie.WatchedRuntime = watchedRuntime;
+            existingMovie.NumberOfEpisodes = episodes;
+            existingMovie.WatchedEpisodes = watchedEpisodes;
+            existingMovie.Rating = rating;
+            existingMovie.TmdbId = null;
+        }
+
+        await Db.SaveChangesAsync();
+        await OnParametersSetAsync();
+    }
+
+    private async Task DeleteMovieFromListAsync(int movieId)
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId) || ListId is null)
+        {
+            return;
+        }
+
+        var watchList = await Db.WatchLists
+            .Include(w => w.Movies)
+            .FirstOrDefaultAsync(w => w.Id == ListId.Value && (w.UserId == userId || w.SharedWithUsers.Any(u => u.Id == userId)));
+        if (watchList is null)
+        {
+            return;
+        }
+
+        var movie = watchList.Movies.FirstOrDefault(m => m.Id == movieId);
+        if (movie is null)
+        {
+            return;
+        }
+
+        watchList.Movies.Remove(movie);
+        await Db.SaveChangesAsync();
+        await OnParametersSetAsync();
+    }
+}

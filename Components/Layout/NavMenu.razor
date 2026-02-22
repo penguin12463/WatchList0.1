@@ -1,0 +1,124 @@
+﻿@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.EntityFrameworkCore
+@using WatchList0._1.Data
+@using WatchList0._1.Components.Shared
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApplicationDbContext Db
+
+<div class="top-row navbar navbar-dark">
+    <div class="container-fluid">
+        <NavLink href="/" class="logo-link">
+            <WatchlystLogo />
+        </NavLink>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable d-flex flex-column"
+     style="height: 100%; width: 100%;"
+    onclick="if (!event.target.closest('.nav-footer')) document.querySelector('.navbar-toggler').click()">    
+    <nav class="nav flex-column flex-grow-1">
+        @if (watchLists.Count > 0)
+        {
+            @foreach (var list in watchLists)
+            {
+                <div class="nav-item px-2">
+                    <NavLink class="nav-link" href="@(list.IsPendingInvite ? $"/settings?listId={list.Id}" : $"/?listId={list.Id}")">
+                        <span class="bi bi-list-nested-nav-menu" style="vertical-align: middle;"></span>
+                        @list.Name
+                        @if (list.IsPendingInvite)
+                        {
+                            <span class="bi bi-clock-fill pending-share-icon" style="vertical-align: bottom; margin-left: 10px; padding-bottom: 0px; padding-top: 2px;"></span>
+                        }
+                    </NavLink>
+                </div>
+            }
+        }
+
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="/newlist">
+                <span class="bi bi-plus-square-fill-nav-menu"></span>
+                New List
+            </NavLink>
+        </div>
+    </nav>
+
+    <div class="nav-footer" onclick="event.stopPropagation()" style="gap:20px;">
+        <img src="/images/tmdb.svg" alt="TMDB Logo" class="tmdb-logo" />
+
+        <label class="spotlight-switch" for="spotlight-toggle" onclick="event.stopPropagation()">
+            <span class="spotlight-switch-label" style="color: black;">Spotlight</span>
+            <span class="spotlight-switch-control">
+                <input id="spotlight-toggle"
+                       type="checkbox"
+                      onchange="window.watchlystSetSpotlight(this.checked)"
+                       onclick="event.stopPropagation()" />
+                <span class="spotlight-switch-slider"></span>
+            </span>
+        </label>
+    </div>
+</div>
+
+
+@code {
+    private sealed class NavWatchListItem
+    {
+        public int Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public bool IsPendingInvite { get; init; }
+    }
+
+    private readonly List<NavWatchListItem> watchLists = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return;
+        }
+
+        var lists = await Db.WatchLists
+            .Where(w => w.UserId == userId || w.SharedWithUsers.Any(u => u.Id == userId))
+            .OrderBy(w => w.Name)
+            .ThenBy(w => w.Id)
+            .ToListAsync();
+
+        watchLists.AddRange(lists.Select(w => new NavWatchListItem
+        {
+            Id = w.Id,
+            Name = string.IsNullOrWhiteSpace(w.Name) ? "New List" : w.Name,
+            IsPendingInvite = false
+        }));
+
+        var pendingInvites = await Db.WatchListShareInvitations
+            .Where(i => i.UserId == userId)
+            .Select(i => new { i.WatchListId, ListName = i.WatchList!.Name })
+            .OrderBy(i => i.ListName)
+            .ThenBy(i => i.WatchListId)
+            .ToListAsync();
+
+        foreach (var invite in pendingInvites)
+        {
+            if (watchLists.Any(w => w.Id == invite.WatchListId))
+            {
+                continue;
+            }
+
+            watchLists.Add(new NavWatchListItem
+            {
+                Id = invite.WatchListId,
+                Name = string.IsNullOrWhiteSpace(invite.ListName) ? "New List" : invite.ListName,
+                IsPendingInvite = true
+            });
+        }
+    }
+
+}
+

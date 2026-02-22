@@ -1,0 +1,162 @@
+@page "/signup"
+@attribute [ExcludeFromInteractiveRouting]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Antiforgery
+@using WatchList0._1.Services
+
+@inject IUserService UserService
+@inject IAntiforgery Antiforgery
+@inject NavigationManager Navigation
+
+<h1>Sign Up</h1>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (HttpContext is not null)
+{
+    var tokens = GetAntiforgeryTokensSafely(HttpContext);
+
+    if (tokens is null)
+    {
+        <div class="alert alert-danger">Unable to initialize security token. Please refresh and try again.</div>
+        return;
+    }
+
+    <form method="post" action="/signup" @formname="signUpForm">
+        <input type="hidden"
+               name="__RequestVerificationToken"
+               value="@tokens.RequestToken" />
+
+        <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text"
+                   class="form-control"
+                   name="username"
+                   required />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input type="password"
+                   class="form-control"
+                   name="password"
+                   required />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Confirm Password</label>
+            <input type="password"
+                   class="form-control"
+                   name="confirmPassword"
+                   required />
+        </div>
+
+        <button class="btn btn-primary" type="submit">Sign Up</button>
+    </form>
+}
+
+@code {
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext?.Request.Method == "POST")
+        {
+            await HandleSignUp();
+        }
+    }
+
+    private async Task HandleSignUp()
+    {
+        if (HttpContext == null)
+            return;
+
+        var form = await HttpContext.Request.ReadFormAsync();
+        var username = form["username"].ToString().Trim();
+        var password = form["password"].ToString();
+        var confirmPassword = form["confirmPassword"].ToString();
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            errorMessage = "Username is required.";
+            return;
+        }
+
+        if (password.Length < 8)
+        {
+            errorMessage = "Password must be at least 8 characters.";
+            return;
+        }
+
+        if (!string.Equals(password, confirmPassword, StringComparison.Ordinal))
+        {
+            errorMessage = "Passwords do not match.";
+            return;
+        }
+
+        var user = await UserService.CreateUserAsync(username, password);
+
+        if (user is null)
+        {
+            errorMessage = "Unable to create user (username may already exist).";
+            return;
+        }
+
+
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id),
+            new Claim(ClaimTypes.Name, user.Username)
+        };
+
+        var identity = new ClaimsIdentity(claims, "cookie");
+        var principal = new ClaimsPrincipal(identity);
+
+        await HttpContext.SignInAsync(
+            "cookie",
+            principal,
+            new AuthenticationProperties
+            {
+                IsPersistent = true,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7)
+            });
+
+        HttpContext.Response.Redirect("/");
+    }
+
+    private AntiforgeryTokenSet? GetAntiforgeryTokensSafely(HttpContext httpContext)
+    {
+        try
+        {
+            return Antiforgery.GetAndStoreTokens(httpContext);
+        }
+        catch (FormatException)
+        {
+            var badTokenCookies = httpContext.Request.Cookies.Keys
+                .Where(key => key.StartsWith(".AspNetCore.Antiforgery", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var cookieName in badTokenCookies)
+            {
+                httpContext.Response.Cookies.Delete(cookieName);
+            }
+
+            try
+            {
+                return Antiforgery.GetAndStoreTokens(httpContext);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    }
+}

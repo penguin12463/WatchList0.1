@@ -1,0 +1,44 @@
+@page "/NewList"
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using WatchList0._1.Data
+
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApplicationDbContext Db
+
+@code{
+    private bool hasCreatedList;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || hasCreatedList)
+        {
+            return;
+        }
+
+        hasCreatedList = true;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            var watchList = new WatchListEntity
+            {
+                Name = "New List",
+                UserId = userId
+            };
+
+            Db.WatchLists.Add(watchList);
+            await Db.SaveChangesAsync();
+
+            Navigation.NavigateTo($"/settings?listId={watchList.Id}", forceLoad: true);
+            return;
+        }
+
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+}

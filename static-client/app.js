@@ -11,18 +11,20 @@ const setStatus = (msg, isError = false) => {
   statusEl.style.color = isError ? "#b42323" : "#1d4ed8";
 };
 
+function toErrorMessage(error, fallback = "Request failed.") {
+  const message = error?.message || String(error || "");
+  if (!message || message === "TypeError: Failed to fetch" || message.includes("NetworkError")) {
+    return "Network error talking to Supabase. Check domain/SSL and try again.";
+  }
+  return message || fallback;
+}
+
 function escapeHtml(input) {
   return (input ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
 }
 
 async function initSignInPage() {
   const authError = document.getElementById("auth-error");
-  const { data } = await supabase.auth.getUser();
-  if (data.user) {
-    window.location.href = "./";
-    return;
-  }
-
   const form = document.getElementById("signin-form");
   const submitBtn = document.getElementById("signin-submit");
   form?.addEventListener("submit", async (ev) => {
@@ -47,11 +49,12 @@ async function initSignInPage() {
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      const message = toErrorMessage(error, "Sign in failed.");
       if (authError) {
-        authError.textContent = error.message;
+        authError.textContent = message;
         authError.classList.remove("hidden");
       }
-      setStatus(error.message, true);
+      setStatus(message, true);
       submitBtn && (submitBtn.disabled = false);
       return;
     }
@@ -63,12 +66,6 @@ async function initSignInPage() {
 
 async function initSignUpPage() {
   const authError = document.getElementById("auth-error");
-  const { data } = await supabase.auth.getUser();
-  if (data.user) {
-    window.location.href = "./";
-    return;
-  }
-
   const form = document.getElementById("signup-form");
   const submitBtn = document.getElementById("signup-submit");
   form?.addEventListener("submit", async (ev) => {
@@ -118,11 +115,12 @@ async function initSignUpPage() {
     });
 
     if (error) {
+      const message = toErrorMessage(error, "Sign up failed.");
       if (authError) {
-        authError.textContent = error.message;
+        authError.textContent = message;
         authError.classList.remove("hidden");
       }
-      setStatus(error.message, true);
+      setStatus(message, true);
       submitBtn && (submitBtn.disabled = false);
       return;
     }
@@ -370,8 +368,18 @@ async function initAppPage() {
   };
 
   const bootstrap = async () => {
-    const { data } = await supabase.auth.getUser();
-    sessionUser = data.user;
+    let user = null;
+    try {
+      const { data } = await supabase.auth.getUser();
+      user = data.user;
+    } catch (err) {
+      const message = toErrorMessage(err);
+      setStatus(message, true);
+      const { data: sess } = await supabase.auth.getSession();
+      user = sess?.session?.user ?? null;
+    }
+
+    sessionUser = user;
 
     if (!sessionUser) {
       authCard.classList.remove("hidden");

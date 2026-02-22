@@ -7,6 +7,9 @@ const authCard = document.getElementById("auth-card");
 const appRoot = document.getElementById("app");
 const statusEl = document.getElementById("status");
 const whoamiEl = document.getElementById("whoami");
+const logoutBtn = document.getElementById("logout-btn");
+const spotlightToggle = document.getElementById("spotlight-toggle");
+const contentSurface = document.getElementById("content-surface");
 
 const listsEl = document.getElementById("lists");
 const moviesEl = document.getElementById("movies");
@@ -27,6 +30,38 @@ const setStatus = (msg, isError = false) => {
 
 function escapeHtml(input) {
   return (input ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+}
+
+function applySpotlightState(enabled) {
+  if (!contentSurface) return;
+  contentSurface.classList.toggle("spotlight-off", !enabled);
+  if (spotlightToggle) {
+    spotlightToggle.checked = enabled;
+  }
+  localStorage.setItem("watchlyst.spotlight", enabled ? "1" : "0");
+}
+
+function initSpotlight() {
+  const saved = localStorage.getItem("watchlyst.spotlight");
+  applySpotlightState(saved !== "0");
+
+  window.addEventListener("mousemove", (ev) => {
+    if (!contentSurface || contentSurface.classList.contains("spotlight-off")) {
+      return;
+    }
+
+    const rect = contentSurface.getBoundingClientRect();
+    const x = ev.clientX - rect.left;
+    const y = ev.clientY - rect.top;
+    if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
+      contentSurface.style.setProperty("--mx", `${x}px`);
+      contentSurface.style.setProperty("--my", `${y}px`);
+    }
+  });
+
+  spotlightToggle?.addEventListener("change", () => {
+    applySpotlightState(spotlightToggle.checked);
+  });
 }
 
 async function ensureProfile(username) {
@@ -62,24 +97,28 @@ async function loadWatchlists() {
 
 function renderWatchlists() {
   if (!watchlists.length) {
-    listsEl.innerHTML = "<p>No lists yet.</p>";
+    listsEl.innerHTML = `<div class="list-item"><span class="nav-link-btn" style="opacity:.8;">No lists yet.</span></div>`;
     return;
   }
 
   listsEl.innerHTML = watchlists.map((w) => {
     const isSelected = selectedList?.id === w.id;
-    const role = w.access_type === "owner" ? "Owner" : w.access_type === "shared" ? "Shared" : "Invite";
+    const role = w.access_type === "owner" ? "OWNER" : w.access_type === "shared" ? "SHARED" : "INVITE";
+    const inviteIcon = w.access_type === "invited" ? `<span class="bi bi-clock-fill pending-share-icon"></span>` : "";
     return `
       <div class="list-item">
         <div class="row">
-          <button class="secondary" data-action="select-list" data-id="${w.id}">${escapeHtml(w.name)}</button>
-          <span>${role}</span>
+          <button class="nav-link-btn ${isSelected ? "active" : ""}" data-action="select-list" data-id="${w.id}">
+            <span class="bi bi-list-nested"></span>
+            <span>${escapeHtml(w.name)}</span>
+            ${inviteIcon}
+          </button>
         </div>
-        <div class="row" style="margin-top:6px;">
+        <div class="row" style="margin-top:4px;">
+          <span class="role-badge">${role}</span>
           ${w.access_type === "invited"
             ? `<button data-action="accept-invite" data-id="${w.id}">Accept</button><button class="danger" data-action="decline-invite" data-id="${w.id}">Decline</button>`
             : `<button class="danger" data-action="delete-or-leave" data-id="${w.id}">${w.access_type === "owner" ? "Delete" : "Leave"}</button>`}
-          ${isSelected ? "<strong>Selected</strong>" : ""}
         </div>
       </div>
     `;
@@ -291,12 +330,15 @@ async function bootstrap() {
   if (!sessionUser) {
     authCard.classList.remove("hidden");
     appRoot.classList.add("hidden");
+    logoutBtn.classList.add("hidden");
+    whoamiEl.textContent = "Not signed in";
     return;
   }
 
   await ensureProfile(null);
 
   whoamiEl.textContent = sessionUser.email;
+  logoutBtn.classList.remove("hidden");
   authCard.classList.add("hidden");
   appRoot.classList.remove("hidden");
 
@@ -368,7 +410,7 @@ function wireEvents() {
   document.getElementById("signin-form").addEventListener("submit", (ev) => onSignIn(ev).catch((e) => setStatus(e.message, true)));
   document.getElementById("signup-form").addEventListener("submit", (ev) => onSignUp(ev).catch((e) => setStatus(e.message, true)));
 
-  document.getElementById("logout-btn").addEventListener("click", async () => {
+  logoutBtn.addEventListener("click", async () => {
     await supabase.auth.signOut();
     selectedList = null;
     await bootstrap();
@@ -483,4 +525,5 @@ function wireEvents() {
 }
 
 wireEvents();
+initSpotlight();
 bootstrap().catch((e) => setStatus(e.message, true));

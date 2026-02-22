@@ -1,18 +1,420 @@
-body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #111; color: #eee; }
-.container { max-width: 1080px; margin: 0 auto; padding: 20px; }
-.card { background: #1c1c1c; border: 1px solid #333; border-radius: 10px; padding: 14px; }
-.grid { display: grid; grid-template-columns: 340px 1fr; gap: 14px; }
-.stack, .inline { display: flex; gap: 8px; margin-bottom: 10px; }
+html, body {
+	font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+	height: 100%;
+	margin: 0;
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+
+.page {
+	display: flex;
+	min-height: 100vh;
+}
+
+.sidebar {
+	width: 175px;
+	height: 100vh;
+	position: sticky;
+	top: 0;
+	background: linear-gradient(180deg, #000000 30%, #eab308 100%);
+	color: #fff;
+	display: flex;
+	flex-direction: column;
+}
+
+main {
+	flex: 1;
+	min-width: 0;
+}
+
+.top-row {
+	min-height: 3.5rem;
+	background-color: #000;
+	color: #fff;
+	display: flex;
+	align-items: center;
+	position: sticky;
+	top: 0;
+	z-index: 2;
+}
+
+.sidebar-top {
+	padding: 0 8px;
+}
+
+.top-auth-row {
+	justify-content: flex-end;
+	padding: 0 1.5rem 0 2rem;
+}
+
+.top-auth-content {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.top-auth-content #whoami {
+	color: #fff;
+	font-size: 0.95rem;
+}
+
+#logout-btn {
+	white-space: nowrap;
+	color: #fff;
+	background: #111;
+	border: 1px solid #333;
+	border-radius: 6px;
+	padding: 0.35rem 0.6rem;
+}
+
+#logout-btn:hover {
+	border-color: #666;
+}
+
+.logo-link {
+	display: inline-block;
+}
+
+.watchlyst-logo {
+	width: 155px;
+	max-width: 100%;
+	height: auto;
+}
+
+.bar {
+	stroke: white;
+	stroke-width: 5;
+	stroke-linecap: butt;
+	transform-box: fill-box;
+	transform-origin: center;
+	transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.watchlyst-logo-container:hover .bar1 { transform: translate(17.5px, -15.5px) rotate(-71.565deg) scale(0.917); }
+.watchlyst-logo-container:hover .bar2 { transform: translate(7.5px, -3.5px) rotate(71.565deg) scale(0.917); }
+.watchlyst-logo-container:hover .bar3 { transform: translate(-2.5px, 8.5px) rotate(-71.565deg) scale(0.917); }
+.watchlyst-logo-container:hover .bar4 { transform: translate(-12.5px, 19.5px) rotate(71.565deg) scale(0.917); }
+
+.nav-scrollable {
+	display: flex;
+	flex-direction: column;
+	height: calc(100vh - 3.5rem);
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding-bottom: 5rem;
+}
+
+.nav {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+}
+
+#lists {
+	padding: 0.5rem;
+}
+
+.list-item {
+	margin-bottom: 0.3rem;
+	padding: 0.15rem;
+}
+
+.list-item .row {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.list-item .row + .row {
+	margin-top: 0.25rem;
+}
+
+.nav-link-btn,
+.list-item button,
+.new-list-btn {
+	border: none;
+	border-radius: 4px;
+	min-height: 2.3rem;
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	width: 100%;
+	color: #d7d7d7;
+	background: transparent;
+	font-size: 0.9rem;
+	cursor: pointer;
+	padding: 0.35rem 0.45rem;
+}
+
+.list-item button:hover,
+.new-list-btn:hover {
+	background-color: rgba(255, 255, 255, 0.1);
+	color: #fff;
+}
+
+.list-item button.active {
+	background-color: rgba(255, 255, 255, 0.37);
+	color: #fff;
+}
+
+.list-item .role-badge {
+	margin-left: auto;
+	color: #fff;
+	font-size: 0.72rem;
+	opacity: 0.9;
+}
+
+.new-list-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	padding: 0.25rem 0.55rem;
+}
+
+.new-list-form input {
+	border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	background: rgba(0, 0, 0, 0.35);
+	color: #fff;
+	padding: 0.4rem 0.55rem;
+}
+
+.new-list-form input::placeholder {
+	color: rgba(255, 255, 255, 0.7);
+}
+
+.pending-share-icon {
+	color: #fef08a;
+}
+
+.nav-footer {
+	margin-top: auto;
+	padding: 0.55rem 0 0.9rem;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.6rem;
+}
+
+.tmdb-logo {
+	width: 50%;
+	height: auto;
+	display: block;
+}
+
+.spotlight-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: #000;
+	font-size: 0.85rem;
+	user-select: none;
+}
+
+.spotlight-switch-control {
+	position: relative;
+	width: 40px;
+	height: 22px;
+	display: inline-flex;
+}
+
+.spotlight-switch-control input {
+	opacity: 0;
+	width: 0;
+	height: 0;
+	position: absolute;
+}
+
+.spotlight-switch-slider {
+	position: absolute;
+	inset: 0;
+	background-color: rgba(255, 255, 255, 0.35);
+	border: 1px solid rgba(255, 255, 255, 0.5);
+	border-radius: 999px;
+	transition: background-color 0.2s ease-in-out;
+}
+
+.spotlight-switch-slider::before {
+	content: "";
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	left: 2px;
+	top: 2px;
+	border-radius: 50%;
+	background: #fff;
+	transition: transform 0.2s ease-in-out;
+}
+
+.spotlight-switch-control input:checked + .spotlight-switch-slider {
+	background-color: #60a5fa;
+	border-color: #60a5fa;
+}
+
+.spotlight-switch-control input:checked + .spotlight-switch-slider::before {
+	transform: translateX(18px);
+}
+
+.content {
+	padding: 1.1rem 1.5rem 0 2rem;
+	min-height: calc(100vh - 3.5rem);
+	background:
+		radial-gradient(
+			circle 1000px at var(--mx, 50%) var(--my, 35%),
+			rgba(255, 255, 255, 1) 0%,
+			rgba(255, 255, 255, 0.97) 28%,
+			rgba(255, 255, 255, 0.88) 50%,
+			rgba(255, 255, 255, 0.72) 66%,
+			rgba(255, 255, 255, 0.50) 80%,
+			rgba(255, 255, 255, 0.28) 90%,
+			rgba(255, 255, 255, 0.12) 96%,
+			rgba(255, 255, 255, 0.06) 100%
+		),
+		#2e2e2e;
+	color: #000;
+	overflow: hidden;
+}
+
+.content.spotlight-off {
+	background: #fff !important;
+}
+
+.card,
+.owner-card,
+.movie-item {
+	border: 1px solid currentColor;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.65);
+	padding: 10px;
+}
+
+.auth-wrap {
+	max-width: 960px;
+}
+
+.auth-columns {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1rem;
+}
+
+.app-panel {
+	max-width: 900px;
+}
+
+.title-row {
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+	align-items: center;
+}
+
+.title-row h3 {
+	grid-column: 2;
+	margin: 0 0 1rem;
+}
+
+.stack,
+.inline {
+	display: flex;
+	gap: 0.6rem;
+	margin-bottom: 0.75rem;
+}
+
 .stack { flex-direction: column; }
-.inline input { flex: 1; }
-input, button { border-radius: 8px; border: 1px solid #444; background: #0f0f0f; color: #eee; padding: 8px; }
-button { cursor: pointer; background: #2055f5; border-color: #2055f5; }
-button.danger { background: #b42323; border-color: #b42323; }
-button.secondary { background: #333; border-color: #555; }
-.hidden { display: none; }
-.toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 14px; }
-.list-item, .movie-item { border: 1px solid #333; border-radius: 8px; padding: 8px; margin-bottom: 8px; }
-.row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
-.hint { opacity: 0.8; font-size: 12px; }
-#status { min-height: 20px; color: #9ec1ff; }
-@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+input,
+button {
+	border-radius: 6px;
+	border: 1px solid #7b7b7b;
+	background: #fff;
+	color: #000;
+	padding: 0.45rem 0.6rem;
+}
+
+button {
+	cursor: pointer;
+	background: #1b6ec2;
+	border-color: #1861ac;
+	color: #fff;
+}
+
+button.danger {
+	background: #b42323;
+	border-color: #8f1515;
+}
+
+button.secondary {
+	background: #111;
+	border-color: #333;
+}
+
+.row {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.6rem;
+	align-items: center;
+}
+
+.movie-item {
+	border: 2px solid transparent;
+	margin-bottom: 0.5rem;
+}
+
+.movie-item:hover {
+	border-color: currentColor;
+}
+
+.movie-add-form {
+	margin: 0.8rem 0;
+}
+
+.movie-add-form input {
+	flex: 1;
+}
+
+.add-btn {
+	padding: 0.4rem 0.55rem;
+}
+
+#status {
+	min-height: 20px;
+	color: #1d4ed8;
+	margin-top: 0.8rem;
+}
+
+.hint {
+	opacity: 0.8;
+	font-size: 12px;
+}
+
+.hidden { display: none !important; }
+
+@media (max-width: 900px) {
+	.page {
+		flex-direction: column;
+	}
+
+	.sidebar {
+		width: 100%;
+		height: auto;
+		position: static;
+	}
+
+	.nav-scrollable {
+		height: auto;
+		padding-bottom: 1rem;
+	}
+
+	.content {
+		padding: 1rem;
+		min-height: auto;
+	}
+
+	.top-auth-row {
+		padding: 0.5rem 1rem;
+	}
+
+	.auth-columns {
+		grid-template-columns: 1fr;
+	}
+}

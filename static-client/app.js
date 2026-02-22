@@ -273,11 +273,15 @@ async function onSignUp(ev) {
     return;
   }
 
-  if (data.user) {
+  if (data.session?.user) {
+    sessionUser = data.session.user;
     await ensureProfile(username);
+    setStatus("Sign-up successful. You are signed in.");
+    await bootstrap();
+    return;
   }
 
-  setStatus("Sign-up successful. If email verification is required, verify then sign in.");
+  setStatus("Sign-up successful. Check your email to confirm your account, then sign in.");
 }
 
 async function bootstrap() {

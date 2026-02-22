@@ -53,20 +53,30 @@ async function initSignInPage() {
     submitBtn && (submitBtn.disabled = true);
     setStatus("Signing in...");
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      const message = toErrorMessage(error, "Sign in failed.");
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        const message = toErrorMessage(error, "Sign in failed.");
+        if (authError) {
+          authError.textContent = message;
+          authError.classList.remove("hidden");
+        }
+        setStatus(message, true);
+        submitBtn && (submitBtn.disabled = false);
+        return;
+      }
+
+      setStatus("Signed in. Redirecting...");
+      window.location.href = "./";
+    } catch (err) {
+      const message = toErrorMessage(err, "Sign in failed.");
       if (authError) {
         authError.textContent = message;
         authError.classList.remove("hidden");
       }
       setStatus(message, true);
       submitBtn && (submitBtn.disabled = false);
-      return;
     }
-
-    setStatus("Signed in. Redirecting...");
-    window.location.href = "./";
   });
 }
 
@@ -114,31 +124,41 @@ async function initSignUpPage() {
     submitBtn && (submitBtn.disabled = true);
     setStatus("Creating account...");
 
-    const { data: signupData, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { username } }
-    });
+    try {
+      const { data: signupData, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { username } }
+      });
 
-    if (error) {
-      const message = toErrorMessage(error, "Sign up failed.");
+      if (error) {
+        const message = toErrorMessage(error, "Sign up failed.");
+        if (authError) {
+          authError.textContent = message;
+          authError.classList.remove("hidden");
+        }
+        setStatus(message, true);
+        submitBtn && (submitBtn.disabled = false);
+        return;
+      }
+
+      if (signupData.session?.user) {
+        setStatus("Sign-up successful. Redirecting...");
+        window.location.href = "./";
+        return;
+      }
+
+      setStatus("Sign-up successful. Check your email to confirm your account, then sign in.");
+      submitBtn && (submitBtn.disabled = false);
+    } catch (err) {
+      const message = toErrorMessage(err, "Sign up failed.");
       if (authError) {
         authError.textContent = message;
         authError.classList.remove("hidden");
       }
       setStatus(message, true);
       submitBtn && (submitBtn.disabled = false);
-      return;
     }
-
-    if (signupData.session?.user) {
-      setStatus("Sign-up successful. Redirecting...");
-      window.location.href = "./";
-      return;
-    }
-
-    setStatus("Sign-up successful. Check your email to confirm your account, then sign in.");
-    submitBtn && (submitBtn.disabled = false);
   });
 }
 
@@ -375,14 +395,15 @@ async function initAppPage() {
 
   const bootstrap = async () => {
     let user = null;
-    try {
-      const { data } = await supabase.auth.getUser();
-      user = data.user;
-    } catch (err) {
-      const message = toErrorMessage(err);
-      setStatus(message, true);
-      const { data: sess } = await supabase.auth.getSession();
-      user = sess?.session?.user ?? null;
+    const { data: sess } = await supabase.auth.getSession();
+    user = sess?.session?.user ?? null;
+
+    if (!user && typeof navigator !== "undefined" && navigator.onLine) {
+      try {
+        const { data } = await supabase.auth.getUser();
+        user = data.user;
+      } catch {
+      }
     }
 
     sessionUser = user;

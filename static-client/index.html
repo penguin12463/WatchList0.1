@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Watchlyst Static</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Watchlyst</h1>
+
+    <section id="auth-card" class="card">
+      <h2>Sign in</h2>
+      <form id="signin-form" class="stack">
+        <input id="signin-email" type="email" placeholder="Email" required />
+        <input id="signin-password" type="password" placeholder="Password" required minlength="8" />
+        <button type="submit">Sign In</button>
+      </form>
+
+      <h2>Create account</h2>
+      <form id="signup-form" class="stack">
+        <input id="signup-email" type="email" placeholder="Email" required />
+        <input id="signup-username" type="text" placeholder="Username" required maxlength="50" />
+        <input id="signup-password" type="password" placeholder="Password" required minlength="8" />
+        <button type="submit">Sign Up</button>
+      </form>
+      <p class="hint">If email confirmation is enabled, verify your email before signing in.</p>
+    </section>
+
+    <section id="app" class="hidden">
+      <div class="toolbar">
+        <span id="whoami"></span>
+        <button id="logout-btn" type="button">Log out</button>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Your Watchlists</h2>
+          <form id="new-list-form" class="inline">
+            <input id="new-list-name" type="text" placeholder="New List" maxlength="50" required />
+            <button type="submit">Create</button>
+          </form>
+          <div id="lists"></div>
+        </section>
+
+        <section class="card">
+          <h2 id="current-list-title">Select a list</h2>
+          <div id="owner-actions" class="hidden">
+            <form id="rename-form" class="inline">
+              <input id="rename-input" type="text" maxlength="50" required />
+              <button type="submit">Rename</button>
+            </form>
+            <form id="invite-form" class="inline">
+              <input id="invite-username" type="text" placeholder="Invite username" maxlength="50" required />
+              <button type="submit">Invite</button>
+            </form>
+            <div id="shared-users"></div>
+          </div>
+
+          <form id="add-movie-form" class="inline hidden">
+            <input id="movie-title-input" type="text" placeholder="Add movie or show" maxlength="120" required />
+            <button type="submit">Add</button>
+          </form>
+
+          <div id="movies"></div>
+        </section>
+      </div>
+    </section>
+
+    <p id="status"></p>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

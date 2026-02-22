@@ -1,0 +1,18 @@
+body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #111; color: #eee; }
+.container { max-width: 1080px; margin: 0 auto; padding: 20px; }
+.card { background: #1c1c1c; border: 1px solid #333; border-radius: 10px; padding: 14px; }
+.grid { display: grid; grid-template-columns: 340px 1fr; gap: 14px; }
+.stack, .inline { display: flex; gap: 8px; margin-bottom: 10px; }
+.stack { flex-direction: column; }
+.inline input { flex: 1; }
+input, button { border-radius: 8px; border: 1px solid #444; background: #0f0f0f; color: #eee; padding: 8px; }
+button { cursor: pointer; background: #2055f5; border-color: #2055f5; }
+button.danger { background: #b42323; border-color: #b42323; }
+button.secondary { background: #333; border-color: #555; }
+.hidden { display: none; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 14px; }
+.list-item, .movie-item { border: 1px solid #333; border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+.row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.hint { opacity: 0.8; font-size: 12px; }
+#status { min-height: 20px; color: #9ec1ff; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }

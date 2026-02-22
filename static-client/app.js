@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222c";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222d";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -109,6 +109,29 @@ function withTimeout(promise, ms, label) {
   return Promise.race([promise, timeoutPromise]).finally(() => {
     clearTimeout(timerId);
   });
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitForSession(timeoutMs = 5000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const { data } = await supabase.auth.getSession();
+    if (data?.session?.access_token) {
+      return data.session;
+    }
+    await sleep(150);
+  }
+  return null;
+}
+
+async function completeSignInOrThrow() {
+  const session = await withTimeout(waitForSession(5000), 6000, "Session verification");
+  if (!session) {
+    throw new Error("Sign in completed but no session was established.");
+  }
+  setStatus("Signed in. Redirecting...");
+  window.location.replace("./");
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -224,8 +247,7 @@ async function initSignInPage() {
         setStatus(message, true);
         try {
           await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
-          setStatus("Signed in. Redirecting...");
-          window.location.href = "./";
+          await completeSignInOrThrow();
           return;
         } catch (fallbackErr) {
           const fallbackMessage = toErrorMessage(fallbackErr, "Sign in failed.");
@@ -236,13 +258,11 @@ async function initSignInPage() {
         }
       }
 
-      setStatus("Signed in. Redirecting...");
-      window.location.href = "./";
+      await completeSignInOrThrow();
     } catch (err) {
       try {
         await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
-        setStatus("Signed in. Redirecting...");
-        window.location.href = "./";
+        await completeSignInOrThrow();
       } catch (fallbackErr) {
         const message = toErrorMessage(fallbackErr, "Sign in failed.");
         showAuthError(authError, message, fallbackErr);
@@ -317,8 +337,7 @@ async function initSignUpPage() {
       }
 
       if (signupData.session?.user) {
-        setStatus("Sign-up successful. Redirecting...");
-        window.location.href = "./";
+        await completeSignInOrThrow();
         return;
       }
 
@@ -332,8 +351,7 @@ async function initSignUpPage() {
             access_token: fallback.access_token,
             refresh_token: fallback.refresh_token
           });
-          setStatus("Sign-up successful. Redirecting...");
-          window.location.href = "./";
+          await completeSignInOrThrow();
           return;
         }
 

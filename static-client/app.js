@@ -1,7 +1,109 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222a";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222b";
+
+const nativeFetch = globalThis.fetch.bind(globalThis);
+
+function escapeHtml(input) {
+  return (input ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+}
+
+function isNetworkLikeError(error) {
+  const message = String(error?.message ?? error ?? "");
+  return (
+    error?.name === "TypeError" ||
+    message.includes("Failed to fetch") ||
+    message.includes("NetworkError") ||
+    message.includes("Load failed")
+  );
+}
+
+function normalizeHeaders(headersLike) {
+  if (!headersLike) return {};
+  if (headersLike instanceof Headers) return Object.fromEntries(headersLike.entries());
+  if (Array.isArray(headersLike)) return Object.fromEntries(headersLike);
+  return headersLike;
+}
+
+function addNetworkDiagnostics(error, url, method, source) {
+  const base = error instanceof Error ? error : new Error(String(error ?? "Unknown error"));
+  const lines = [
+    `${method} ${url}`,
+    `transport: ${source}`,
+    `online: ${typeof navigator !== "undefined" ? navigator.onLine : "unknown"}`,
+    `origin: ${typeof location !== "undefined" ? location.origin : "unknown"}`
+  ];
+  base._diagMessage = lines.join("\n");
+  return base;
+}
+
+function xhrFetch(input, init = {}) {
+  const method = (init.method || "GET").toUpperCase();
+  const url = typeof input === "string" ? input : input.url;
+  const headers = normalizeHeaders(init.headers);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url, true);
+    xhr.timeout = 20000;
+
+    Object.entries(headers).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        xhr.setRequestHeader(key, String(value));
+      }
+    });
+
+    xhr.onload = () => {
+      const responseHeaders = new Headers();
+      const rawHeaders = xhr.getAllResponseHeaders() || "";
+      rawHeaders.trim().split(/\r?\n/).forEach((line) => {
+        const index = line.indexOf(":");
+        if (index <= 0) return;
+        const key = line.slice(0, index).trim();
+        const value = line.slice(index + 1).trim();
+        if (key) responseHeaders.append(key, value);
+      });
+
+      resolve(new Response(xhr.responseText, {
+        status: xhr.status,
+        statusText: xhr.statusText,
+        headers: responseHeaders
+      }));
+    };
+
+    xhr.onerror = () => reject(addNetworkDiagnostics(new TypeError("NetworkError when attempting to fetch resource."), url, method, "xhr"));
+    xhr.ontimeout = () => reject(addNetworkDiagnostics(new TypeError("Network request timed out."), url, method, "xhr"));
+    xhr.send(init.body ?? null);
+  });
+}
+
+async function fetchWithTransportFallback(input, init = {}) {
+  const method = (init.method || "GET").toUpperCase();
+  const url = typeof input === "string" ? input : input.url;
+  try {
+    return await nativeFetch(input, init);
+  } catch (error) {
+    if (!isNetworkLikeError(error)) throw error;
+    try {
+      return await xhrFetch(input, init);
+    } catch (xhrError) {
+      throw addNetworkDiagnostics(xhrError, url, method, "fetch->xhr");
+    }
+  }
+}
+
+async function requestJson(url, init) {
+  const response = await fetchWithTransportFallback(url, init);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.msg || payload?.error_description || payload?.error || `Request failed (${response.status})`);
+  }
+  return payload;
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: {
+    fetch: fetchWithTransportFallback
+  },
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -17,6 +119,17 @@ const setStatus = (msg, isError = false) => {
   statusEl.style.color = isError ? "#b42323" : "#1d4ed8";
 };
 
+function showAuthError(authErrorEl, message, error) {
+  if (!authErrorEl) return;
+  const diagnostic = error?._diagMessage;
+  if (diagnostic) {
+    authErrorEl.innerHTML = `${escapeHtml(message)}<details style="margin-top:8px;"><summary>Connection diagnostics</summary><pre style="white-space:pre-wrap; margin:6px 0 0;">${escapeHtml(diagnostic)}</pre></details>`;
+  } else {
+    authErrorEl.textContent = message;
+  }
+  authErrorEl.classList.remove("hidden");
+}
+
 function toErrorMessage(error, fallback = "Request failed.") {
   const message = error?.message || String(error || "");
   if (!message || message === "TypeError: Failed to fetch" || message.includes("NetworkError")) {
@@ -25,12 +138,8 @@ function toErrorMessage(error, fallback = "Request failed.") {
   return message || fallback;
 }
 
-function escapeHtml(input) {
-  return (input ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
-}
-
 async function restSignIn(email, password) {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+  const payload = await requestJson(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: "POST",
     mode: "cors",
     credentials: "omit",
@@ -40,11 +149,6 @@ async function restSignIn(email, password) {
     },
     body: JSON.stringify({ email, password })
   });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${response.status})`);
-  }
 
   if (!payload?.access_token || !payload?.refresh_token) {
     throw new Error("Sign in response missing session tokens.");
@@ -57,7 +161,7 @@ async function restSignIn(email, password) {
 }
 
 async function restSignUp(email, password, username) {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+  return await requestJson(`${SUPABASE_URL}/auth/v1/signup`, {
     method: "POST",
     mode: "cors",
     credentials: "omit",
@@ -71,13 +175,6 @@ async function restSignUp(email, password, username) {
       data: { username }
     })
   });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload?.msg || payload?.error_description || payload?.error || `Sign up failed (${response.status})`);
-  }
-
-  return payload;
 }
 
 async function initSignInPage() {
@@ -108,10 +205,7 @@ async function initSignInPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         const message = toErrorMessage(error, "Sign in failed.");
-        if (authError) {
-          authError.textContent = message;
-          authError.classList.remove("hidden");
-        }
+        showAuthError(authError, message, error);
         setStatus(message, true);
         submitBtn && (submitBtn.disabled = false);
         return;
@@ -126,10 +220,7 @@ async function initSignInPage() {
         window.location.href = "./";
       } catch (fallbackErr) {
         const message = toErrorMessage(fallbackErr, "Sign in failed.");
-        if (authError) {
-          authError.textContent = message;
-          authError.classList.remove("hidden");
-        }
+        showAuthError(authError, message, fallbackErr);
         setStatus(message, true);
         submitBtn && (submitBtn.disabled = false);
       }
@@ -190,10 +281,7 @@ async function initSignUpPage() {
 
       if (error) {
         const message = toErrorMessage(error, "Sign up failed.");
-        if (authError) {
-          authError.textContent = message;
-          authError.classList.remove("hidden");
-        }
+        showAuthError(authError, message, error);
         setStatus(message, true);
         submitBtn && (submitBtn.disabled = false);
         return;
@@ -224,10 +312,7 @@ async function initSignUpPage() {
         submitBtn && (submitBtn.disabled = false);
       } catch (fallbackErr) {
         const message = toErrorMessage(fallbackErr, "Sign up failed.");
-        if (authError) {
-          authError.textContent = message;
-          authError.classList.remove("hidden");
-        }
+        showAuthError(authError, message, fallbackErr);
         setStatus(message, true);
         submitBtn && (submitBtn.disabled = false);
       }

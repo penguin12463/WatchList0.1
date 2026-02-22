@@ -7,13 +7,20 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body data-page="signin" class="auth-page">
-  <main class="auth-main">
-    <section class="auth-wrap card">
+  <main class="auth-main auth-main-plain">
+    <section class="auth-wrap auth-wrap-plain">
       <h1>Sign In</h1>
-      <form id="signin-form" class="stack" style="margin-top: 14px;">
-        <input id="signin-email" type="email" placeholder="Email" required />
-        <input id="signin-password" type="password" placeholder="Password" required minlength="8" />
-        <button type="submit">Sign In</button>
+      <div id="auth-error" class="auth-error hidden"></div>
+      <form id="signin-form" class="stack" style="margin-top: 14px; max-width: 520px;">
+        <div class="mb-3">
+          <label class="form-label" for="signin-email">Email</label>
+          <input id="signin-email" type="text" placeholder="Email" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="signin-password">Password</label>
+          <input id="signin-password" type="password" placeholder="Password" required minlength="8" />
+        </div>
+        <button id="signin-submit" type="submit">Sign In</button>
       </form>
       <p class="hint" style="margin-top:14px;">Don't have an account? <a href="./signup.html"><strong>Sign Up</strong></a></p>
       <p id="status"></p>

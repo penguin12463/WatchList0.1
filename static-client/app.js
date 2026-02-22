@@ -16,6 +16,7 @@ function escapeHtml(input) {
 }
 
 async function initSignInPage() {
+  const authError = document.getElementById("auth-error");
   const { data } = await supabase.auth.getUser();
   if (data.user) {
     window.location.href = "./";
@@ -23,22 +24,45 @@ async function initSignInPage() {
   }
 
   const form = document.getElementById("signin-form");
+  const submitBtn = document.getElementById("signin-submit");
   form?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
+    authError?.classList.add("hidden");
+    authError && (authError.textContent = "");
+
     const email = document.getElementById("signin-email").value.trim();
     const password = document.getElementById("signin-password").value;
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setStatus(error.message, true);
+    if (!email || !password) {
+      if (authError) {
+        authError.textContent = "Email and password are required.";
+        authError.classList.remove("hidden");
+      }
+      setStatus("Please complete all fields.", true);
       return;
     }
 
+    submitBtn && (submitBtn.disabled = true);
+    setStatus("Signing in...");
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      if (authError) {
+        authError.textContent = error.message;
+        authError.classList.remove("hidden");
+      }
+      setStatus(error.message, true);
+      submitBtn && (submitBtn.disabled = false);
+      return;
+    }
+
+    setStatus("Signed in. Redirecting...");
     window.location.href = "./";
   });
 }
 
 async function initSignUpPage() {
+  const authError = document.getElementById("auth-error");
   const { data } = await supabase.auth.getUser();
   if (data.user) {
     window.location.href = "./";
@@ -46,12 +70,46 @@ async function initSignUpPage() {
   }
 
   const form = document.getElementById("signup-form");
+  const submitBtn = document.getElementById("signup-submit");
   form?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
+    authError?.classList.add("hidden");
+    authError && (authError.textContent = "");
 
     const email = document.getElementById("signup-email").value.trim();
     const username = document.getElementById("signup-username").value.trim();
     const password = document.getElementById("signup-password").value;
+    const confirmPassword = document.getElementById("signup-confirm-password").value;
+
+    if (!username || !email || !password || !confirmPassword) {
+      if (authError) {
+        authError.textContent = "All fields are required.";
+        authError.classList.remove("hidden");
+      }
+      setStatus("Please complete all fields.", true);
+      return;
+    }
+
+    if (password.length < 8) {
+      if (authError) {
+        authError.textContent = "Password must be at least 8 characters.";
+        authError.classList.remove("hidden");
+      }
+      setStatus("Password too short.", true);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      if (authError) {
+        authError.textContent = "Passwords do not match.";
+        authError.classList.remove("hidden");
+      }
+      setStatus("Passwords do not match.", true);
+      return;
+    }
+
+    submitBtn && (submitBtn.disabled = true);
+    setStatus("Creating account...");
 
     const { data: signupData, error } = await supabase.auth.signUp({
       email,
@@ -60,7 +118,12 @@ async function initSignUpPage() {
     });
 
     if (error) {
+      if (authError) {
+        authError.textContent = error.message;
+        authError.classList.remove("hidden");
+      }
       setStatus(error.message, true);
+      submitBtn && (submitBtn.disabled = false);
       return;
     }
 
@@ -71,6 +134,7 @@ async function initSignUpPage() {
     }
 
     setStatus("Sign-up successful. Check your email to confirm your account, then sign in.");
+    submitBtn && (submitBtn.disabled = false);
   });
 }
 

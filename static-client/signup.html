@@ -7,14 +7,28 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body data-page="signup" class="auth-page">
-  <main class="auth-main">
-    <section class="auth-wrap card">
+  <main class="auth-main auth-main-plain">
+    <section class="auth-wrap auth-wrap-plain">
       <h1>Sign Up</h1>
-      <form id="signup-form" class="stack" style="margin-top: 14px;">
-        <input id="signup-email" type="email" placeholder="Email" required />
-        <input id="signup-username" type="text" placeholder="Username" required maxlength="50" />
-        <input id="signup-password" type="password" placeholder="Password" required minlength="8" />
-        <button type="submit">Sign Up</button>
+      <div id="auth-error" class="auth-error hidden"></div>
+      <form id="signup-form" class="stack" style="margin-top: 14px; max-width: 520px;">
+        <div class="mb-3">
+          <label class="form-label" for="signup-username">Username</label>
+          <input id="signup-username" type="text" placeholder="Username" required maxlength="50" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="signup-email">Email</label>
+          <input id="signup-email" type="text" placeholder="Email" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="signup-password">Password</label>
+          <input id="signup-password" type="password" placeholder="Password" required minlength="8" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="signup-confirm-password">Confirm Password</label>
+          <input id="signup-confirm-password" type="password" placeholder="Confirm Password" required minlength="8" />
+        </div>
+        <button id="signup-submit" type="submit">Sign Up</button>
       </form>
       <p class="hint" style="margin-top:14px;">Already have an account? <a href="./signin.html"><strong>Sign In</strong></a></p>
       <p id="status"></p>

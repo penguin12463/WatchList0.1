@@ -387,6 +387,34 @@ button.secondary {
 	font-size: 12px;
 }
 
+.auth-link-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	text-decoration: none;
+	border-radius: 6px;
+	border: 1px solid #1861ac;
+	background: #1b6ec2;
+	color: #fff;
+	padding: 0.45rem 0.9rem;
+}
+
+.auth-link-btn.secondary {
+	background: #111;
+	border-color: #333;
+}
+
+.auth-page {
+	min-height: 100vh;
+	background: #2e2e2e;
+	display: flex;
+}
+
+.auth-main {
+	margin: auto;
+	width: min(560px, calc(100vw - 2rem));
+}
+
 .hidden { display: none !important; }
 
 @media (max-width: 900px) {

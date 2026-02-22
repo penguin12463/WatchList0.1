@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
-<body>
+<body data-page="app">
   <div class="page">
     <aside class="sidebar">
       <div class="top-row sidebar-top">
@@ -60,30 +60,15 @@
       </div>
 
       <article class="content" id="content-surface">
-        <section id="auth-card" class="auth-wrap card">
-          <div class="auth-columns">
-            <div>
-              <h2>Sign in</h2>
-              <form id="signin-form" class="stack">
-                <input id="signin-email" type="email" placeholder="Email" required />
-                <input id="signin-password" type="password" placeholder="Password" required minlength="8" />
-                <button type="submit">Sign In</button>
-              </form>
-            </div>
-            <div>
-              <h2>Create account</h2>
-              <form id="signup-form" class="stack">
-                <input id="signup-email" type="email" placeholder="Email" required />
-                <input id="signup-username" type="text" placeholder="Username" required maxlength="50" />
-                <input id="signup-password" type="password" placeholder="Password" required minlength="8" />
-                <button type="submit">Sign Up</button>
-              </form>
-              <p class="hint">If email confirmation is enabled, verify your email before signing in.</p>
-            </div>
+        <section id="signed-out-panel" class="auth-wrap card hidden">
+          <h1>Please sign in!</h1>
+          <div class="inline" style="justify-content:center; margin-top:20px;">
+            <a class="auth-link-btn" href="./signin.html">Sign In</a>
+            <a class="auth-link-btn secondary" href="./signup.html">Sign Up</a>
           </div>
         </section>
 
-        <section id="app" class="hidden app-panel">
+        <section id="app" class="app-panel hidden">
           <div class="title-row">
             <h3 id="current-list-title">Select a list</h3>
           </div>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Watchlyst - Sign Up</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body data-page="signup" class="auth-page">
+  <main class="auth-main">
+    <section class="auth-wrap card">
+      <h1>Sign Up</h1>
+      <form id="signup-form" class="stack" style="margin-top: 14px;">
+        <input id="signup-email" type="email" placeholder="Email" required />
+        <input id="signup-username" type="text" placeholder="Username" required maxlength="50" />
+        <input id="signup-password" type="password" placeholder="Password" required minlength="8" />
+        <button type="submit">Sign Up</button>
+      </form>
+      <p class="hint" style="margin-top:14px;">Already have an account? <a href="./signin.html"><strong>Sign In</strong></a></p>
+      <p id="status"></p>
+    </section>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

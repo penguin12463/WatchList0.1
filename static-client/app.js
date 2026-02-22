@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222d";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222e";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -112,6 +112,31 @@ function withTimeout(promise, ms, label) {
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const PENDING_SESSION_KEY = "watchlyst.pendingSession";
+
+function savePendingSession(session) {
+  if (!session?.access_token || !session?.refresh_token) return;
+  try {
+    sessionStorage.setItem(PENDING_SESSION_KEY, JSON.stringify({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token
+    }));
+  } catch {
+  }
+}
+
+function takePendingSession() {
+  try {
+    const raw = sessionStorage.getItem(PENDING_SESSION_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(PENDING_SESSION_KEY);
+    const parsed = JSON.parse(raw);
+    if (!parsed?.access_token || !parsed?.refresh_token) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 async function waitForSession(timeoutMs = 5000) {
   const started = Date.now();
@@ -125,11 +150,24 @@ async function waitForSession(timeoutMs = 5000) {
   return null;
 }
 
-async function completeSignInOrThrow() {
+async function completeSignInOrThrow(sessionCandidate = null) {
+  if (sessionCandidate?.access_token && sessionCandidate?.refresh_token) {
+    savePendingSession(sessionCandidate);
+    try {
+      await withTimeout(supabase.auth.setSession({
+        access_token: sessionCandidate.access_token,
+        refresh_token: sessionCandidate.refresh_token
+      }), 5000, "Session apply");
+    } catch {
+    }
+  }
+
   const session = await withTimeout(waitForSession(5000), 6000, "Session verification");
   if (!session) {
     throw new Error("Sign in completed but no session was established.");
   }
+
+  savePendingSession(session);
   setStatus("Signed in. Redirecting...");
   window.location.replace("./");
 }
@@ -192,6 +230,8 @@ async function restSignIn(email, password) {
     access_token: payload.access_token,
     refresh_token: payload.refresh_token
   });
+
+  return payload;
 }
 
 async function restSignUp(email, password, username) {
@@ -236,7 +276,7 @@ async function initSignInPage() {
     setStatus("Signing in...");
 
     try {
-      const { error } = await withTimeout(
+      const { data, error } = await withTimeout(
         supabase.auth.signInWithPassword({ email, password }),
         15000,
         "Sign in request"
@@ -246,8 +286,8 @@ async function initSignInPage() {
         showAuthError(authError, message, error);
         setStatus(message, true);
         try {
-          await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
-          await completeSignInOrThrow();
+          const fallbackSession = await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
+          await completeSignInOrThrow(fallbackSession);
           return;
         } catch (fallbackErr) {
           const fallbackMessage = toErrorMessage(fallbackErr, "Sign in failed.");
@@ -258,11 +298,11 @@ async function initSignInPage() {
         }
       }
 
-      await completeSignInOrThrow();
+      await completeSignInOrThrow(data?.session ?? null);
     } catch (err) {
       try {
-        await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
-        await completeSignInOrThrow();
+        const fallbackSession = await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
+        await completeSignInOrThrow(fallbackSession);
       } catch (fallbackErr) {
         const message = toErrorMessage(fallbackErr, "Sign in failed.");
         showAuthError(authError, message, fallbackErr);
@@ -337,7 +377,7 @@ async function initSignUpPage() {
       }
 
       if (signupData.session?.user) {
-        await completeSignInOrThrow();
+        await completeSignInOrThrow(signupData.session);
         return;
       }
 
@@ -351,7 +391,7 @@ async function initSignUpPage() {
             access_token: fallback.access_token,
             refresh_token: fallback.refresh_token
           });
-          await completeSignInOrThrow();
+          await completeSignInOrThrow(fallback);
           return;
         }
 
@@ -599,6 +639,14 @@ async function initAppPage() {
   };
 
   const bootstrap = async () => {
+    const pendingSession = takePendingSession();
+    if (pendingSession) {
+      try {
+        await withTimeout(supabase.auth.setSession(pendingSession), 8000, "Pending session restore");
+      } catch {
+      }
+    }
+
     let user = null;
     const { data: sess } = await supabase.auth.getSession();
     user = sess?.session?.user ?? null;

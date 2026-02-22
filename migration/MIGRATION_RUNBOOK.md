@@ -39,3 +39,29 @@ Option B (Cloudflare Pages):
 - [ ] Validate TMDB lookup works from edge function.
 - [ ] Export/backup old SQLite DB.
 - [ ] Point DNS/custom domain to static host.
+
+## Production hardening checklist
+- [ ] Rotate TMDB API key in TMDB dashboard.
+- [ ] Update Supabase secret with the rotated key:
+   - `supabase secrets set TMDB_API_KEY=<new-key> TMDB_BASE_URL=https://api.themoviedb.org/3 --project-ref itozjiieewburafwwqhm`
+- [ ] Keep `service_role` key out of frontend code (frontend must only use anon key).
+- [ ] In Supabase Authentication settings:
+   - [ ] Enable email confirmation.
+   - [ ] Configure bot/rate protections for auth endpoints.
+   - [ ] Keep Site URL and Redirect URLs limited to your production domain(s).
+
+## Backup and recovery
+- Supabase backup cadence (minimum):
+   - Weekly full backup export.
+   - Pre-release backup before schema or policy changes.
+- Suggested backup command (`pg_dump` with Supabase connection string):
+   - `pg_dump --format=custom --file=watchlyst_$(date +%F).dump "<SUPABASE_DB_CONNECTION_STRING>"`
+- Recovery drill (monthly):
+   - Restore backup into a staging database.
+   - Verify sign-in, list creation, sharing, and movie updates.
+
+## Repository visibility and code split
+- Current repo is public and contains both legacy server code and static client code.
+- If you only want static app public, split into:
+   - Public repo: `static-client` only.
+   - Private repo: legacy/server code and historical configs.

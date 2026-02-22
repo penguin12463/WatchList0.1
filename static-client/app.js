@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222b";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222c";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -98,6 +98,17 @@ async function requestJson(url, init) {
     throw new Error(payload?.msg || payload?.error_description || payload?.error || `Request failed (${response.status})`);
   }
   return payload;
+}
+
+function withTimeout(promise, ms, label) {
+  let timerId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => reject(new Error(`${label} timed out. Please try again.`)), ms);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timerId);
+  });
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -202,20 +213,34 @@ async function initSignInPage() {
     setStatus("Signing in...");
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        15000,
+        "Sign in request"
+      );
       if (error) {
         const message = toErrorMessage(error, "Sign in failed.");
         showAuthError(authError, message, error);
         setStatus(message, true);
-        submitBtn && (submitBtn.disabled = false);
-        return;
+        try {
+          await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
+          setStatus("Signed in. Redirecting...");
+          window.location.href = "./";
+          return;
+        } catch (fallbackErr) {
+          const fallbackMessage = toErrorMessage(fallbackErr, "Sign in failed.");
+          showAuthError(authError, fallbackMessage, fallbackErr);
+          setStatus(fallbackMessage, true);
+          submitBtn && (submitBtn.disabled = false);
+          return;
+        }
       }
 
       setStatus("Signed in. Redirecting...");
       window.location.href = "./";
     } catch (err) {
       try {
-        await restSignIn(email, password);
+        await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
         setStatus("Signed in. Redirecting...");
         window.location.href = "./";
       } catch (fallbackErr) {
@@ -273,11 +298,15 @@ async function initSignUpPage() {
     setStatus("Creating account...");
 
     try {
-      const { data: signupData, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { username } }
-      });
+      const { data: signupData, error } = await withTimeout(
+        supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { username } }
+        }),
+        15000,
+        "Sign up request"
+      );
 
       if (error) {
         const message = toErrorMessage(error, "Sign up failed.");
@@ -297,7 +326,7 @@ async function initSignUpPage() {
       submitBtn && (submitBtn.disabled = false);
     } catch (err) {
       try {
-        const fallback = await restSignUp(email, password, username);
+        const fallback = await withTimeout(restSignUp(email, password, username), 15000, "Fallback sign up request");
         if (fallback?.access_token && fallback?.refresh_token) {
           await supabase.auth.setSession({
             access_token: fallback.access_token,

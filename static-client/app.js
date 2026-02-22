@@ -29,6 +29,57 @@ function escapeHtml(input) {
   return (input ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
 }
 
+async function restSignIn(email, password) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    mode: "cors",
+    credentials: "omit",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ email, password })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${response.status})`);
+  }
+
+  if (!payload?.access_token || !payload?.refresh_token) {
+    throw new Error("Sign in response missing session tokens.");
+  }
+
+  await supabase.auth.setSession({
+    access_token: payload.access_token,
+    refresh_token: payload.refresh_token
+  });
+}
+
+async function restSignUp(email, password, username) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: "POST",
+    mode: "cors",
+    credentials: "omit",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      data: { username }
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.msg || payload?.error_description || payload?.error || `Sign up failed (${response.status})`);
+  }
+
+  return payload;
+}
+
 async function initSignInPage() {
   const authError = document.getElementById("auth-error");
   const form = document.getElementById("signin-form");
@@ -69,13 +120,19 @@ async function initSignInPage() {
       setStatus("Signed in. Redirecting...");
       window.location.href = "./";
     } catch (err) {
-      const message = toErrorMessage(err, "Sign in failed.");
-      if (authError) {
-        authError.textContent = message;
-        authError.classList.remove("hidden");
+      try {
+        await restSignIn(email, password);
+        setStatus("Signed in. Redirecting...");
+        window.location.href = "./";
+      } catch (fallbackErr) {
+        const message = toErrorMessage(fallbackErr, "Sign in failed.");
+        if (authError) {
+          authError.textContent = message;
+          authError.classList.remove("hidden");
+        }
+        setStatus(message, true);
+        submitBtn && (submitBtn.disabled = false);
       }
-      setStatus(message, true);
-      submitBtn && (submitBtn.disabled = false);
     }
   });
 }
@@ -151,13 +208,29 @@ async function initSignUpPage() {
       setStatus("Sign-up successful. Check your email to confirm your account, then sign in.");
       submitBtn && (submitBtn.disabled = false);
     } catch (err) {
-      const message = toErrorMessage(err, "Sign up failed.");
-      if (authError) {
-        authError.textContent = message;
-        authError.classList.remove("hidden");
+      try {
+        const fallback = await restSignUp(email, password, username);
+        if (fallback?.access_token && fallback?.refresh_token) {
+          await supabase.auth.setSession({
+            access_token: fallback.access_token,
+            refresh_token: fallback.refresh_token
+          });
+          setStatus("Sign-up successful. Redirecting...");
+          window.location.href = "./";
+          return;
+        }
+
+        setStatus("Sign-up successful. Check your email to confirm your account, then sign in.");
+        submitBtn && (submitBtn.disabled = false);
+      } catch (fallbackErr) {
+        const message = toErrorMessage(fallbackErr, "Sign up failed.");
+        if (authError) {
+          authError.textContent = message;
+          authError.classList.remove("hidden");
+        }
+        setStatus(message, true);
+        submitBtn && (submitBtn.disabled = false);
       }
-      setStatus(message, true);
-      submitBtn && (submitBtn.disabled = false);
     }
   });
 }

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222e";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222f";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -153,20 +153,13 @@ async function waitForSession(timeoutMs = 5000) {
 async function completeSignInOrThrow(sessionCandidate = null) {
   if (sessionCandidate?.access_token && sessionCandidate?.refresh_token) {
     savePendingSession(sessionCandidate);
-    try {
-      await withTimeout(supabase.auth.setSession({
-        access_token: sessionCandidate.access_token,
-        refresh_token: sessionCandidate.refresh_token
-      }), 5000, "Session apply");
-    } catch {
-    }
+    setStatus("Signed in. Redirecting...");
+    window.location.replace("./");
+    return;
   }
 
   const session = await withTimeout(waitForSession(5000), 6000, "Session verification");
-  if (!session) {
-    throw new Error("Sign in completed but no session was established.");
-  }
-
+  if (!session) throw new Error("Sign in completed but no session was established.");
   savePendingSession(session);
   setStatus("Signed in. Redirecting...");
   window.location.replace("./");
@@ -211,7 +204,7 @@ function toErrorMessage(error, fallback = "Request failed.") {
 }
 
 async function restSignIn(email, password) {
-  const payload = await requestJson(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+  const payload = await withTimeout(requestJson(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: "POST",
     mode: "cors",
     credentials: "omit",
@@ -220,16 +213,11 @@ async function restSignIn(email, password) {
       "content-type": "application/json"
     },
     body: JSON.stringify({ email, password })
-  });
+  }), 12000, "Auth token request");
 
   if (!payload?.access_token || !payload?.refresh_token) {
     throw new Error("Sign in response missing session tokens.");
   }
-
-  await supabase.auth.setSession({
-    access_token: payload.access_token,
-    refresh_token: payload.refresh_token
-  });
 
   return payload;
 }

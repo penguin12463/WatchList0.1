@@ -16,3 +16,6 @@ obj/
 
 # Logs
 *.log
+
+# Supabase CLI local metadata
+supabase/.temp/

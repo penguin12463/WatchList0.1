@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222f";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222g";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -79,8 +79,20 @@ function xhrFetch(input, init = {}) {
 async function fetchWithTransportFallback(input, init = {}) {
   const method = (init.method || "GET").toUpperCase();
   const url = typeof input === "string" ? input : input.url;
+
+  const fetchWithInternalTimeout = () => {
+    let timerId;
+    const timeoutPromise = new Promise((_, reject) => {
+      timerId = setTimeout(() => {
+        reject(addNetworkDiagnostics(new TypeError("Fetch request timed out."), url, method, "fetch-timeout"));
+      }, 6000);
+    });
+
+    return Promise.race([nativeFetch(input, init), timeoutPromise]).finally(() => clearTimeout(timerId));
+  };
+
   try {
-    return await nativeFetch(input, init);
+    return await fetchWithInternalTimeout();
   } catch (error) {
     if (!isNetworkLikeError(error)) throw error;
     try {
@@ -213,7 +225,7 @@ async function restSignIn(email, password) {
       "content-type": "application/json"
     },
     body: JSON.stringify({ email, password })
-  }), 12000, "Auth token request");
+  }), 25000, "Auth token request");
 
   if (!payload?.access_token || !payload?.refresh_token) {
     throw new Error("Sign in response missing session tokens.");

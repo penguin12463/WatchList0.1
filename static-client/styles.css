@@ -53,6 +53,20 @@ main {
 	gap: 1rem;
 }
 
+.top-auth-content .nav-link {
+	color: #ffffff;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.top-auth-content .nav-link strong {
+	color: #60a5fa;
+}
+
+.top-auth-content .nav-link:hover {
+	text-decoration: underline;
+}
+
 .top-auth-content #whoami {
 	color: #fff;
 	font-size: 0.95rem;

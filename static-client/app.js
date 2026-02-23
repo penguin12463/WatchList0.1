@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223f";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223g";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -663,6 +663,8 @@ async function initAppPage() {
   const appRoot = document.getElementById("app");
   const whoamiEl = document.getElementById("whoami");
   const logoutBtn = document.getElementById("logout-btn");
+  const signInTopLink = document.getElementById("signin-top-link");
+  const signUpTopLink = document.getElementById("signup-top-link");
   const spotlightToggle = document.getElementById("spotlight-toggle");
   const contentSurface = document.getElementById("content-surface");
 
@@ -835,6 +837,23 @@ async function initAppPage() {
     }
   };
 
+  const setLoggedOutUi = () => {
+    authCard.classList.remove("hidden");
+    appRoot.classList.add("hidden");
+    logoutBtn.classList.add("hidden");
+    signInTopLink?.classList.remove("hidden");
+    signUpTopLink?.classList.remove("hidden");
+    whoamiEl.textContent = "Not signed in";
+  };
+
+  const setLoggedInUi = () => {
+    logoutBtn.classList.remove("hidden");
+    signInTopLink?.classList.add("hidden");
+    signUpTopLink?.classList.add("hidden");
+    authCard.classList.add("hidden");
+    appRoot.classList.remove("hidden");
+  };
+
   const tmdbFetch = async (payload) => {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
@@ -913,19 +932,27 @@ async function initAppPage() {
     sessionUser = user;
 
     if (!sessionUser) {
-      authCard.classList.remove("hidden");
-      appRoot.classList.add("hidden");
-      logoutBtn.classList.add("hidden");
-      whoamiEl.textContent = "Not signed in";
+      setLoggedOutUi();
       return;
     }
 
     await ensureProfile(null);
     whoamiEl.textContent = sessionUser.email;
-    logoutBtn.classList.remove("hidden");
-    authCard.classList.add("hidden");
-    appRoot.classList.remove("hidden");
-    await loadWatchlists();
+    setLoggedInUi();
+
+    try {
+      await loadWatchlists();
+    } catch (loadError) {
+      const message = String(loadError?.message ?? "").toLowerCase();
+      if (message.includes("jwt") || message.includes("auth") || message.includes("token") || message.includes("expired")) {
+        await supabase.auth.signOut();
+        sessionUser = null;
+        setLoggedOutUi();
+        setStatus("Session expired. Please sign in again.", true);
+        return;
+      }
+      throw loadError;
+    }
   };
 
   const selectList = async (id) => {
@@ -1008,14 +1035,31 @@ async function initAppPage() {
 
   document.getElementById("new-list-form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    const name = document.getElementById("new-list-name").value.trim();
-    if (!name) return;
+    if (!sessionUser?.id) {
+      setStatus("Please sign in to create a list.", true);
+      return;
+    }
 
-    const { error } = await supabase.from("watchlists").insert({ name, owner_id: sessionUser.id });
+    const inputEl = document.getElementById("new-list-name");
+    const name = inputEl.value.trim() || "New List";
+
+    const { data: createdList, error } = await supabase
+      .from("watchlists")
+      .insert({ name, owner_id: sessionUser.id })
+      .select("id")
+      .single();
+
     if (error) return setStatus(error.message, true);
 
-    document.getElementById("new-list-name").value = "";
+    inputEl.value = "";
     await loadWatchlists();
+
+    const createdId = createdList?.id;
+    if (createdId) {
+      await selectList(createdId);
+    }
+
+    setStatus("New list created. You can now rename and invite users.");
   });
 
   document.getElementById("rename-form")?.addEventListener("submit", async (ev) => {

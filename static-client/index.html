@@ -32,7 +32,7 @@
           <div id="lists"></div>
           <div class="nav-item">
             <form id="new-list-form" class="new-list-form">
-              <input id="new-list-name" type="text" placeholder="New List" maxlength="50" required />
+              <input id="new-list-name" type="text" placeholder="New List" maxlength="50" />
               <button type="submit" class="new-list-btn"><span class="bi bi-plus-square-fill"></span>New List</button>
             </form>
           </div>
@@ -55,6 +55,8 @@
       <div class="top-row top-auth-row">
         <div class="top-auth-content">
           <span id="whoami"></span>
+          <a id="signin-top-link" class="nav-link hidden" href="./signin.html"><strong>Sign In</strong></a>
+          <a id="signup-top-link" class="nav-link hidden" href="./signup.html"><strong>Sign Up</strong></a>
           <button id="logout-btn" type="button" class="hidden">Logout</button>
         </div>
       </div>
@@ -101,6 +103,6 @@
     </main>
   </div>
 
-  <script type="module" src="./app.js?v=20260223f"></script>
+  <script type="module" src="./app.js?v=20260223g"></script>
 </body>
 </html>

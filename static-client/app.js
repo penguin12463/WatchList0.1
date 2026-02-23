@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223a";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223b";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -288,6 +288,132 @@ async function initSignInPage() {
   const authError = document.getElementById("auth-error");
   const form = document.getElementById("signin-form");
   const submitBtn = document.getElementById("signin-submit");
+  const forgotBtn = document.getElementById("forgot-password-btn");
+  const resetForm = document.getElementById("reset-form");
+  const resetSubmitBtn = document.getElementById("reset-submit");
+
+  const showResetForm = () => {
+    form?.classList.add("hidden");
+    forgotBtn?.classList.add("hidden");
+    resetForm?.classList.remove("hidden");
+  };
+
+  const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+  const recoveryType = hashParams.get("type");
+  const recoveryAccessToken = hashParams.get("access_token");
+  const recoveryRefreshToken = hashParams.get("refresh_token");
+
+  if (recoveryType === "recovery" && recoveryAccessToken && recoveryRefreshToken) {
+    try {
+      await withTimeout(
+        supabase.auth.setSession({
+          access_token: recoveryAccessToken,
+          refresh_token: recoveryRefreshToken
+        }),
+        10000,
+        "Recovery session setup"
+      );
+      showResetForm();
+      setStatus("Set your new password.");
+      if (history?.replaceState) {
+        history.replaceState({}, "", "./signin.html");
+      }
+    } catch (recoveryErr) {
+      const message = toErrorMessage(recoveryErr, "Recovery link is invalid or expired.");
+      showAuthError(authError, message, recoveryErr);
+      setStatus(message, true);
+    }
+  }
+
+  forgotBtn?.addEventListener("click", async () => {
+    authError?.classList.add("hidden");
+    authError && (authError.textContent = "");
+
+    const email = document.getElementById("signin-email").value.trim();
+    if (!email) {
+      const message = "Enter your email first, then click Forgot password.";
+      showAuthError(authError, message);
+      setStatus(message, true);
+      return;
+    }
+
+    forgotBtn.disabled = true;
+    setStatus("Sending reset email...");
+
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}${window.location.pathname}`
+        }),
+        15000,
+        "Password reset request"
+      );
+
+      if (error) throw error;
+      setStatus("Reset email sent. Check your inbox.");
+    } catch (resetErr) {
+      const message = toErrorMessage(resetErr, "Unable to send reset email.");
+      showAuthError(authError, message, resetErr);
+      setStatus(message, true);
+    } finally {
+      forgotBtn.disabled = false;
+    }
+  });
+
+  resetForm?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    authError?.classList.add("hidden");
+    authError && (authError.textContent = "");
+
+    const newPassword = document.getElementById("reset-password").value;
+    const confirmPassword = document.getElementById("reset-confirm-password").value;
+
+    if (!newPassword || !confirmPassword) {
+      const message = "Both password fields are required.";
+      showAuthError(authError, message);
+      setStatus(message, true);
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      const message = "Password must be at least 8 characters.";
+      showAuthError(authError, message);
+      setStatus(message, true);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      const message = "Passwords do not match.";
+      showAuthError(authError, message);
+      setStatus(message, true);
+      return;
+    }
+
+    resetSubmitBtn && (resetSubmitBtn.disabled = true);
+    setStatus("Updating password...");
+
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.updateUser({ password: newPassword }),
+        15000,
+        "Password update"
+      );
+      if (error) throw error;
+
+      setStatus("Password updated. You can now sign in.");
+      await supabase.auth.signOut();
+      resetForm.classList.add("hidden");
+      form?.classList.remove("hidden");
+      forgotBtn?.classList.remove("hidden");
+    } catch (updateErr) {
+      const message = toErrorMessage(updateErr, "Password update failed.");
+      showAuthError(authError, message, updateErr);
+      setStatus(message, true);
+    } finally {
+      resetSubmitBtn && (resetSubmitBtn.disabled = false);
+    }
+  });
+
   form?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     authError?.classList.add("hidden");

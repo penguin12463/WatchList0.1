@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223b";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223c";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -112,6 +112,15 @@ async function requestJson(url, init) {
   return payload;
 }
 
+async function safeGetSession(timeoutMs = 4000) {
+  try {
+    const { data } = await withTimeout(supabase.auth.getSession(), timeoutMs, "Session read");
+    return data?.session ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function withTimeout(promise, ms, label) {
   let timerId;
   const timeoutPromise = new Promise((_, reject) => {
@@ -153,9 +162,9 @@ function takePendingSession() {
 async function waitForSession(timeoutMs = 5000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    const { data } = await supabase.auth.getSession();
-    if (data?.session?.access_token) {
-      return data.session;
+    const session = await safeGetSession(3000);
+    if (session?.access_token) {
+      return session;
     }
     await sleep(150);
   }
@@ -216,11 +225,11 @@ function toErrorMessage(error, fallback = "Request failed.") {
 }
 
 async function restSignIn(email, password) {
-  const started = Date.now();
-  return await new Promise((resolve, reject) => {
+  const xhrAttempt = () => new Promise((resolve, reject) => {
+    const started = Date.now();
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${SUPABASE_URL}/auth/v1/token?grant_type=password`, true);
-    xhr.timeout = 25000;
+    xhr.timeout = 15000;
     xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
     xhr.setRequestHeader("content-type", "application/json");
 
@@ -265,6 +274,34 @@ async function restSignIn(email, password) {
 
     xhr.send(JSON.stringify({ email, password }));
   });
+
+  const fetchAttempt = async () => {
+    const payload = await withTimeout(requestJson(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ email, password })
+    }), 9000, "Auth token request");
+
+    if (!payload?.access_token || !payload?.refresh_token) {
+      throw new Error("Sign in response missing session tokens.");
+    }
+
+    return payload;
+  };
+
+  try {
+    return await fetchAttempt();
+  } catch (fetchErr) {
+    if (!isNetworkLikeError(fetchErr) && !String(fetchErr?.message ?? "").includes("timed out")) {
+      throw fetchErr;
+    }
+    return await xhrAttempt();
+  }
 }
 
 async function restSignUp(email, password, username) {
@@ -781,8 +818,8 @@ async function initAppPage() {
     }
 
     let user = null;
-    const { data: sess } = await supabase.auth.getSession();
-    user = sess?.session?.user ?? null;
+    const session = await safeGetSession(4000);
+    user = session?.user ?? null;
 
     if (!user && typeof navigator !== "undefined" && navigator.onLine) {
       try {

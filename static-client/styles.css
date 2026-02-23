@@ -427,7 +427,15 @@ button.secondary {
 
 .auth-form-shell {
 	max-width: 560px;
+	width: min(560px, 100%);
+	margin: 0 auto;
 	padding-top: 0.4rem;
+}
+
+.content.auth-content {
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .auth-form-shell h1 {

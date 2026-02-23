@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223c";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223d";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -276,7 +276,7 @@ async function restSignIn(email, password) {
   });
 
   const fetchAttempt = async () => {
-    const payload = await withTimeout(requestJson(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    const response = await withTimeout(nativeFetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: "POST",
       mode: "cors",
       credentials: "omit",
@@ -285,7 +285,12 @@ async function restSignIn(email, password) {
         "content-type": "application/json"
       },
       body: JSON.stringify({ email, password })
-    }), 9000, "Auth token request");
+    }), 12000, "Auth token request");
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${response.status})`);
+    }
 
     if (!payload?.access_token || !payload?.refresh_token) {
       throw new Error("Sign in response missing session tokens.");
@@ -297,7 +302,7 @@ async function restSignIn(email, password) {
   try {
     return await fetchAttempt();
   } catch (fetchErr) {
-    if (!isNetworkLikeError(fetchErr) && !String(fetchErr?.message ?? "").includes("timed out")) {
+    if (!isNetworkLikeError(fetchErr) && !String(fetchErr?.message ?? "").toLowerCase().includes("timed out")) {
       throw fetchErr;
     }
     return await xhrAttempt();
@@ -823,7 +828,7 @@ async function initAppPage() {
 
     if (!user && typeof navigator !== "undefined" && navigator.onLine) {
       try {
-        const { data } = await supabase.auth.getUser();
+        const { data } = await withTimeout(supabase.auth.getUser(), 5000, "User fetch");
         user = data.user;
       } catch {
       }

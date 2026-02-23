@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223e";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223f";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -225,65 +225,81 @@ function toErrorMessage(error, fallback = "Request failed.") {
 }
 
 async function restSignIn(email, password) {
-  const xhrAttempt = () => new Promise((resolve, reject) => {
+  const authUrl = `${SUPABASE_URL}/auth/v1/token?grant_type=password`;
+  const diagnostics = [];
+  const collectDiagnostic = (line) => {
+    diagnostics.push(line);
+  };
+
+  const withDiag = (error, transport, status, elapsedMs) => {
+    const err = error instanceof Error ? error : new Error(String(error ?? "Unknown sign-in error"));
+    collectDiagnostic(`transport: ${transport} | status: ${status} | elapsed_ms: ${elapsedMs}`);
+    err._diagMessage = `POST ${authUrl}\n${diagnostics.join("\n")}`;
+    return err;
+  };
+
+  const buildPayload = (rawText) => {
+    try {
+      return JSON.parse(rawText || "{}");
+    } catch {
+      return {};
+    }
+  };
+
+  const isRetryableSignInError = (error) => {
+    const message = String(error?.message ?? "").toLowerCase();
+    return isNetworkLikeError(error) || message.includes("timed out") || message.includes("abort");
+  };
+
+  const xhrAttempt = (timeoutMs = 45000) => new Promise((resolve, reject) => {
     const started = Date.now();
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${SUPABASE_URL}/auth/v1/token?grant_type=password`, true);
-    xhr.timeout = 25000;
+    xhr.open("POST", authUrl, true);
+    xhr.timeout = timeoutMs;
     xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
     xhr.setRequestHeader("content-type", "application/json");
 
     xhr.onload = () => {
       const elapsed = Date.now() - started;
-      let payload = {};
-      try {
-        payload = JSON.parse(xhr.responseText || "{}");
-      } catch {
-        payload = {};
-      }
+      const payload = buildPayload(xhr.responseText);
       if (xhr.status < 200 || xhr.status >= 300) {
-        const err = new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${xhr.status})`);
-        err._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: xhr-direct\nstatus: ${xhr.status}\nelapsed_ms: ${elapsed}`;
-        reject(err);
+        reject(withDiag(new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${xhr.status})`), "xhr-direct", xhr.status, elapsed));
         return;
       }
 
       if (!payload?.access_token || !payload?.refresh_token) {
-        const err = new Error("Sign in response missing session tokens.");
-        err._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: xhr-direct\nstatus: ${xhr.status}\nelapsed_ms: ${elapsed}`;
-        reject(err);
+        reject(withDiag(new Error("Sign in response missing session tokens."), "xhr-direct", xhr.status, elapsed));
         return;
       }
 
+      collectDiagnostic(`transport: xhr-direct | status: ${xhr.status} | elapsed_ms: ${elapsed}`);
       resolve(payload);
     };
 
     xhr.onerror = () => {
       const elapsed = Date.now() - started;
-      const err = new Error("Network error while requesting auth token.");
-      err._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: xhr-direct\nstatus: network-error\nelapsed_ms: ${elapsed}`;
-      reject(err);
+      reject(withDiag(new Error("Network error while requesting auth token."), "xhr-direct", "network-error", elapsed));
     };
 
     xhr.ontimeout = () => {
       const elapsed = Date.now() - started;
-      const err = new Error("Auth token request timed out. Please try again.");
-      err._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: xhr-direct\nstatus: timeout\nelapsed_ms: ${elapsed}`;
-      reject(err);
+      reject(withDiag(new Error("Auth token request timed out. Please try again."), "xhr-direct", "timeout", elapsed));
     };
 
     xhr.send(JSON.stringify({ email, password }));
   });
 
-  const fetchAttempt = async () => {
+  const fetchAttempt = async (timeoutMs, label) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const started = Date.now();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     let response;
     try {
-      response = await nativeFetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      response = await nativeFetch(authUrl, {
       method: "POST",
       mode: "cors",
       credentials: "omit",
+      cache: "no-store",
       headers: {
         apikey: SUPABASE_ANON_KEY,
         "content-type": "application/json"
@@ -292,36 +308,81 @@ async function restSignIn(email, password) {
       signal: controller.signal
       });
     } catch (err) {
+      const elapsed = Date.now() - started;
       if (err?.name === "AbortError") {
-        const timeoutErr = new Error("Auth token request timed out. Please try again.");
-        timeoutErr._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: fetch\nstatus: timeout\nelapsed_ms: 25000`;
-        throw timeoutErr;
+        throw withDiag(new Error("Auth token request timed out. Please try again."), label, "timeout", elapsed);
       }
-      throw err;
+      throw withDiag(err, label, "network-error", elapsed);
     } finally {
       clearTimeout(timeoutId);
     }
 
+    const elapsed = Date.now() - started;
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${response.status})`);
+      throw withDiag(new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${response.status})`), label, response.status, elapsed);
     }
 
     if (!payload?.access_token || !payload?.refresh_token) {
-      throw new Error("Sign in response missing session tokens.");
+      throw withDiag(new Error("Sign in response missing session tokens."), label, response.status, elapsed);
     }
 
+    collectDiagnostic(`transport: ${label} | status: ${response.status} | elapsed_ms: ${elapsed}`);
     return payload;
   };
 
-  try {
-    return await fetchAttempt();
-  } catch (fetchErr) {
-    if (!isNetworkLikeError(fetchErr) && !String(fetchErr?.message ?? "").toLowerCase().includes("timed out")) {
-      throw fetchErr;
+  const sdkAttempt = async (timeoutMs) => {
+    const started = Date.now();
+    try {
+      const { data, error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        timeoutMs,
+        "Auth SDK sign in"
+      );
+      if (error) throw error;
+      const session = data?.session;
+      if (!session?.access_token || !session?.refresh_token) {
+        throw new Error("Sign in response missing session tokens.");
+      }
+      const elapsed = Date.now() - started;
+      collectDiagnostic(`transport: sdk-signInWithPassword | status: success | elapsed_ms: ${elapsed}`);
+      return {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token
+      };
+    } catch (err) {
+      const elapsed = Date.now() - started;
+      throw withDiag(err, "sdk-signInWithPassword", "failed", elapsed);
     }
-    return await xhrAttempt();
+  };
+
+  try {
+    return await sdkAttempt(30000);
+  } catch (sdkErr) {
+    if (!isRetryableSignInError(sdkErr)) {
+      throw sdkErr;
+    }
   }
+
+  try {
+    return await fetchAttempt(30000, "fetch-direct-1");
+  } catch (fetchErrOne) {
+    if (!isRetryableSignInError(fetchErrOne)) {
+      throw fetchErrOne;
+    }
+  }
+
+  await sleep(300);
+
+  try {
+    return await fetchAttempt(30000, "fetch-direct-2");
+  } catch (fetchErrTwo) {
+    if (!isRetryableSignInError(fetchErrTwo)) {
+      throw fetchErrTwo;
+    }
+  }
+
+  return await xhrAttempt(45000);
 }
 
 async function restSignUp(email, password, username) {

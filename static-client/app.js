@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223i";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223j";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -187,13 +187,10 @@ async function completeSignInOrThrow(sessionCandidate = null) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  global: {
-    fetch: fetchWithTransportFallback
-  },
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false
+    detectSessionInUrl: true
   }
 });
 const page = document.body.dataset.page || "app";
@@ -225,206 +222,68 @@ function toErrorMessage(error, fallback = "Request failed.") {
 }
 
 async function restSignIn(email, password) {
-  const authUrl = `${SUPABASE_URL}/auth/v1/token?grant_type=password`;
-  const authUrlSimple = `${SUPABASE_URL}/auth/v1/token?grant_type=password&apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`;
   const diagnostics = [];
-  const collectDiagnostic = (line) => {
-    diagnostics.push(line);
-  };
 
-  const withDiag = (error, transport, status, elapsedMs) => {
-    const err = error instanceof Error ? error : new Error(String(error ?? "Unknown sign-in error"));
-    collectDiagnostic(`transport: ${transport} | status: ${status} | elapsed_ms: ${elapsedMs}`);
-    err._diagMessage = `POST ${authUrl}\n${diagnostics.join("\n")}`;
-    return err;
-  };
+  const runSdkAttempt = async (label, timeoutMs) => {
+    const started = Date.now();
+    const { data, error } = await withTimeout(
+      supabase.auth.signInWithPassword({ email, password }),
+      timeoutMs,
+      "Sign in"
+    );
 
-  const buildPayload = (rawText) => {
-    try {
-      return JSON.parse(rawText || "{}");
-    } catch {
-      return {};
+    const elapsed = Date.now() - started;
+
+    if (error) {
+      diagnostics.push(`transport: sdk-signInWithPassword (${label}) | status: error | elapsed_ms: ${elapsed} | message: ${error.message}`);
+      throw error;
     }
+
+    const session = data?.session;
+    if (!session?.access_token || !session?.refresh_token) {
+      diagnostics.push(`transport: sdk-signInWithPassword (${label}) | status: invalid-session | elapsed_ms: ${elapsed}`);
+      throw new Error("Sign in response missing session tokens.");
+    }
+
+    diagnostics.push(`transport: sdk-signInWithPassword (${label}) | status: success | elapsed_ms: ${elapsed}`);
+    return {
+      access_token: session.access_token,
+      refresh_token: session.refresh_token
+    };
   };
 
-  const isRetryableSignInError = (error) => {
+  const isRetryableAuthError = (error) => {
     const message = String(error?.message ?? "").toLowerCase();
-    return isNetworkLikeError(error) || message.includes("timed out") || message.includes("abort");
-  };
+    if (!message) return true;
 
-  const xhrAttempt = (timeoutMs = 15000, label = "xhr-direct") => new Promise((resolve, reject) => {
-    const started = Date.now();
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", authUrl, true);
-    xhr.timeout = timeoutMs;
-    xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
-    xhr.setRequestHeader("content-type", "application/json");
-
-    xhr.onload = () => {
-      const elapsed = Date.now() - started;
-      const payload = buildPayload(xhr.responseText);
-      if (xhr.status < 200 || xhr.status >= 300) {
-        reject(withDiag(new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${xhr.status})`), label, xhr.status, elapsed));
-        return;
-      }
-
-      if (!payload?.access_token || !payload?.refresh_token) {
-        reject(withDiag(new Error("Sign in response missing session tokens."), label, xhr.status, elapsed));
-        return;
-      }
-
-      collectDiagnostic(`transport: ${label} | status: ${xhr.status} | elapsed_ms: ${elapsed}`);
-      resolve(payload);
-    };
-
-    xhr.onerror = () => {
-      const elapsed = Date.now() - started;
-      reject(withDiag(new Error("Network error while requesting auth token."), label, "network-error", elapsed));
-    };
-
-    xhr.ontimeout = () => {
-      const elapsed = Date.now() - started;
-      reject(withDiag(new Error("Auth token request timed out. Please try again."), label, "timeout", elapsed));
-    };
-
-    xhr.send(JSON.stringify({ email, password }));
-  });
-
-  const fetchAttempt = async (timeoutMs, label) => {
-    const controller = new AbortController();
-    const started = Date.now();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    let response;
-    try {
-      response = await nativeFetch(authUrl, {
-      method: "POST",
-      mode: "cors",
-      credentials: "omit",
-      cache: "no-store",
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({ email, password }),
-      signal: controller.signal
-      });
-    } catch (err) {
-      const elapsed = Date.now() - started;
-      if (err?.name === "AbortError") {
-        throw withDiag(new Error("Auth token request timed out. Please try again."), label, "timeout", elapsed);
-      }
-      throw withDiag(err, label, "network-error", elapsed);
-    } finally {
-      clearTimeout(timeoutId);
+    if (
+      message.includes("invalid login credentials") ||
+      message.includes("email not confirmed") ||
+      message.includes("user not found") ||
+      message.includes("invalid_grant")
+    ) {
+      return false;
     }
 
-    const elapsed = Date.now() - started;
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw withDiag(new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${response.status})`), label, response.status, elapsed);
-    }
-
-    if (!payload?.access_token || !payload?.refresh_token) {
-      throw withDiag(new Error("Sign in response missing session tokens."), label, response.status, elapsed);
-    }
-
-    collectDiagnostic(`transport: ${label} | status: ${response.status} | elapsed_ms: ${elapsed}`);
-    return payload;
-  };
-
-  const fetchSimpleAttempt = async (timeoutMs, label) => {
-    const controller = new AbortController();
-    const started = Date.now();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    let response;
-    try {
-      response = await nativeFetch(authUrlSimple, {
-        method: "POST",
-        mode: "cors",
-        credentials: "omit",
-        cache: "no-store",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded"
-        },
-        body: new URLSearchParams({ email, password }).toString(),
-        signal: controller.signal
-      });
-    } catch (err) {
-      const elapsed = Date.now() - started;
-      if (err?.name === "AbortError") {
-        throw withDiag(new Error("Auth token request timed out. Please try again."), label, "timeout", elapsed);
-      }
-      throw withDiag(err, label, "network-error", elapsed);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    const elapsed = Date.now() - started;
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw withDiag(new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${response.status})`), label, response.status, elapsed);
-    }
-
-    if (!payload?.access_token || !payload?.refresh_token) {
-      throw withDiag(new Error("Sign in response missing session tokens."), label, response.status, elapsed);
-    }
-
-    collectDiagnostic(`transport: ${label} | status: ${response.status} | elapsed_ms: ${elapsed}`);
-    return payload;
-  };
-
-  const runParallelAttempt = async (fetchLabel, xhrLabel, timeoutMs) => {
-    return await Promise.any([
-      fetchAttempt(timeoutMs, fetchLabel),
-      xhrAttempt(timeoutMs, xhrLabel)
-    ]);
-  };
-
-  const throwBestError = (aggregateError) => {
-    const candidates = Array.isArray(aggregateError?.errors)
-      ? aggregateError.errors
-      : [aggregateError];
-
-    const nonRetryable = candidates.find((err) => !isRetryableSignInError(err));
-    if (nonRetryable) {
-      throw nonRetryable;
-    }
-
-    const finalError = new Error("Auth token request timed out. Please try again.");
-    finalError._diagMessage = `POST ${authUrl}\n${diagnostics.join("\n")}`;
-    throw finalError;
+    return message.includes("timed out") || message.includes("network") || message.includes("fetch") || message.includes("aborted");
   };
 
   try {
-    return await fetchSimpleAttempt(10000, "fetch-simple-form");
-  } catch (simpleErr) {
-    if (!isRetryableSignInError(simpleErr)) {
-      throw simpleErr;
+    return await runSdkAttempt("attempt-1", 20000);
+  } catch (firstError) {
+    if (!isRetryableAuthError(firstError)) {
+      firstError._diagMessage = diagnostics.join("\n");
+      throw firstError;
     }
   }
 
-  try {
-    return await runParallelAttempt("fetch-direct", "xhr-direct", 15000);
-  } catch (fastRoundErr) {
-    if (!(fastRoundErr instanceof AggregateError)) {
-      if (!isRetryableSignInError(fastRoundErr)) {
-        throw fastRoundErr;
-      }
-    } else {
-      const hasNonRetryable = fastRoundErr.errors?.some((err) => !isRetryableSignInError(err));
-      if (hasNonRetryable) {
-        throwBestError(fastRoundErr);
-      }
-    }
-  }
-
-  await sleep(250);
+  await sleep(350);
 
   try {
-    return await runParallelAttempt("fetch-direct-retry", "xhr-direct-retry", 22000);
-  } catch (retryRoundErr) {
-    throwBestError(retryRoundErr);
+    return await runSdkAttempt("attempt-2", 25000);
+  } catch (secondError) {
+    secondError._diagMessage = diagnostics.join("\n");
+    throw secondError;
   }
 }
 

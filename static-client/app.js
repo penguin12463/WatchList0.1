@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260222g";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223a";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -216,22 +216,55 @@ function toErrorMessage(error, fallback = "Request failed.") {
 }
 
 async function restSignIn(email, password) {
-  const payload = await withTimeout(requestJson(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: "POST",
-    mode: "cors",
-    credentials: "omit",
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({ email, password })
-  }), 25000, "Auth token request");
+  const started = Date.now();
+  return await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${SUPABASE_URL}/auth/v1/token?grant_type=password`, true);
+    xhr.timeout = 25000;
+    xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
+    xhr.setRequestHeader("content-type", "application/json");
 
-  if (!payload?.access_token || !payload?.refresh_token) {
-    throw new Error("Sign in response missing session tokens.");
-  }
+    xhr.onload = () => {
+      const elapsed = Date.now() - started;
+      let payload = {};
+      try {
+        payload = JSON.parse(xhr.responseText || "{}");
+      } catch {
+        payload = {};
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const err = new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${xhr.status})`);
+        err._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: xhr-direct\nstatus: ${xhr.status}\nelapsed_ms: ${elapsed}`;
+        reject(err);
+        return;
+      }
 
-  return payload;
+      if (!payload?.access_token || !payload?.refresh_token) {
+        const err = new Error("Sign in response missing session tokens.");
+        err._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: xhr-direct\nstatus: ${xhr.status}\nelapsed_ms: ${elapsed}`;
+        reject(err);
+        return;
+      }
+
+      resolve(payload);
+    };
+
+    xhr.onerror = () => {
+      const elapsed = Date.now() - started;
+      const err = new Error("Network error while requesting auth token.");
+      err._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: xhr-direct\nstatus: network-error\nelapsed_ms: ${elapsed}`;
+      reject(err);
+    };
+
+    xhr.ontimeout = () => {
+      const elapsed = Date.now() - started;
+      const err = new Error("Auth token request timed out. Please try again.");
+      err._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: xhr-direct\nstatus: timeout\nelapsed_ms: ${elapsed}`;
+      reject(err);
+    };
+
+    xhr.send(JSON.stringify({ email, password }));
+  });
 }
 
 async function restSignUp(email, password, username) {
@@ -276,39 +309,13 @@ async function initSignInPage() {
     setStatus("Signing in...");
 
     try {
-      const { data, error } = await withTimeout(
-        supabase.auth.signInWithPassword({ email, password }),
-        15000,
-        "Sign in request"
-      );
-      if (error) {
-        const message = toErrorMessage(error, "Sign in failed.");
-        showAuthError(authError, message, error);
-        setStatus(message, true);
-        try {
-          const fallbackSession = await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
-          await completeSignInOrThrow(fallbackSession);
-          return;
-        } catch (fallbackErr) {
-          const fallbackMessage = toErrorMessage(fallbackErr, "Sign in failed.");
-          showAuthError(authError, fallbackMessage, fallbackErr);
-          setStatus(fallbackMessage, true);
-          submitBtn && (submitBtn.disabled = false);
-          return;
-        }
-      }
-
-      await completeSignInOrThrow(data?.session ?? null);
-    } catch (err) {
-      try {
-        const fallbackSession = await withTimeout(restSignIn(email, password), 15000, "Fallback sign in request");
-        await completeSignInOrThrow(fallbackSession);
-      } catch (fallbackErr) {
-        const message = toErrorMessage(fallbackErr, "Sign in failed.");
-        showAuthError(authError, message, fallbackErr);
-        setStatus(message, true);
-        submitBtn && (submitBtn.disabled = false);
-      }
+      const session = await restSignIn(email, password);
+      await completeSignInOrThrow(session);
+    } catch (signInErr) {
+      const message = toErrorMessage(signInErr, "Sign in failed.");
+      showAuthError(authError, message, signInErr);
+      setStatus(message, true);
+      submitBtn && (submitBtn.disabled = false);
     }
   });
 }

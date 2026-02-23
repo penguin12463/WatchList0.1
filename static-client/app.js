@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223d";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223e";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -229,7 +229,7 @@ async function restSignIn(email, password) {
     const started = Date.now();
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${SUPABASE_URL}/auth/v1/token?grant_type=password`, true);
-    xhr.timeout = 15000;
+    xhr.timeout = 25000;
     xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
     xhr.setRequestHeader("content-type", "application/json");
 
@@ -276,7 +276,11 @@ async function restSignIn(email, password) {
   });
 
   const fetchAttempt = async () => {
-    const response = await withTimeout(nativeFetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    let response;
+    try {
+      response = await nativeFetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: "POST",
       mode: "cors",
       credentials: "omit",
@@ -284,8 +288,19 @@ async function restSignIn(email, password) {
         apikey: SUPABASE_ANON_KEY,
         "content-type": "application/json"
       },
-      body: JSON.stringify({ email, password })
-    }), 12000, "Auth token request");
+      body: JSON.stringify({ email, password }),
+      signal: controller.signal
+      });
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        const timeoutErr = new Error("Auth token request timed out. Please try again.");
+        timeoutErr._diagMessage = `POST ${SUPABASE_URL}/auth/v1/token?grant_type=password\ntransport: fetch\nstatus: timeout\nelapsed_ms: 25000`;
+        throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223h";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223i";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -226,6 +226,7 @@ function toErrorMessage(error, fallback = "Request failed.") {
 
 async function restSignIn(email, password) {
   const authUrl = `${SUPABASE_URL}/auth/v1/token?grant_type=password`;
+  const authUrlSimple = `${SUPABASE_URL}/auth/v1/token?grant_type=password&apikey=${encodeURIComponent(SUPABASE_ANON_KEY)}`;
   const diagnostics = [];
   const collectDiagnostic = (line) => {
     diagnostics.push(line);
@@ -251,7 +252,7 @@ async function restSignIn(email, password) {
     return isNetworkLikeError(error) || message.includes("timed out") || message.includes("abort");
   };
 
-  const xhrAttempt = (timeoutMs = 12000, label = "xhr-direct") => new Promise((resolve, reject) => {
+  const xhrAttempt = (timeoutMs = 15000, label = "xhr-direct") => new Promise((resolve, reject) => {
     const started = Date.now();
     const xhr = new XMLHttpRequest();
     xhr.open("POST", authUrl, true);
@@ -331,6 +332,48 @@ async function restSignIn(email, password) {
     return payload;
   };
 
+  const fetchSimpleAttempt = async (timeoutMs, label) => {
+    const controller = new AbortController();
+    const started = Date.now();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    let response;
+    try {
+      response = await nativeFetch(authUrlSimple, {
+        method: "POST",
+        mode: "cors",
+        credentials: "omit",
+        cache: "no-store",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({ email, password }).toString(),
+        signal: controller.signal
+      });
+    } catch (err) {
+      const elapsed = Date.now() - started;
+      if (err?.name === "AbortError") {
+        throw withDiag(new Error("Auth token request timed out. Please try again."), label, "timeout", elapsed);
+      }
+      throw withDiag(err, label, "network-error", elapsed);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    const elapsed = Date.now() - started;
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw withDiag(new Error(payload?.msg || payload?.error_description || payload?.error || `Sign in failed (${response.status})`), label, response.status, elapsed);
+    }
+
+    if (!payload?.access_token || !payload?.refresh_token) {
+      throw withDiag(new Error("Sign in response missing session tokens."), label, response.status, elapsed);
+    }
+
+    collectDiagnostic(`transport: ${label} | status: ${response.status} | elapsed_ms: ${elapsed}`);
+    return payload;
+  };
+
   const runParallelAttempt = async (fetchLabel, xhrLabel, timeoutMs) => {
     return await Promise.any([
       fetchAttempt(timeoutMs, fetchLabel),
@@ -354,7 +397,15 @@ async function restSignIn(email, password) {
   };
 
   try {
-    return await runParallelAttempt("fetch-direct", "xhr-direct", 12000);
+    return await fetchSimpleAttempt(10000, "fetch-simple-form");
+  } catch (simpleErr) {
+    if (!isRetryableSignInError(simpleErr)) {
+      throw simpleErr;
+    }
+  }
+
+  try {
+    return await runParallelAttempt("fetch-direct", "xhr-direct", 15000);
   } catch (fastRoundErr) {
     if (!(fastRoundErr instanceof AggregateError)) {
       if (!isRetryableSignInError(fastRoundErr)) {
@@ -371,7 +422,7 @@ async function restSignIn(email, password) {
   await sleep(250);
 
   try {
-    return await runParallelAttempt("fetch-direct-retry", "xhr-direct-retry", 16000);
+    return await runParallelAttempt("fetch-direct-retry", "xhr-direct-retry", 22000);
   } catch (retryRoundErr) {
     throwBestError(retryRoundErr);
   }

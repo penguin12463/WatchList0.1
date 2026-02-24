@@ -65,13 +65,9 @@
   <script type="module" src="./app.js?v=20260224d"></script>
   <script src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"></script>
   <script>
-    window.addEventListener('DOMContentLoaded', function() {
-      const CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsud2F0Y2hseXN0LmNvLnVrJA";
-      if (window.Clerk) {
-        window.Clerk.load({ publishableKey: CLERK_PUBLISHABLE_KEY }).then(() => {
-          Clerk.mountSignIn('#clerk-sign-in');
-        });
-      }
+    const CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsud2F0Y2hseXN0LmNvLnVrJA";
+    window.Clerk.load({ publishableKey: CLERK_PUBLISHABLE_KEY }).then(() => {
+      Clerk.mountSignIn('#clerk-sign-in');
     });
   </script>
 </body>

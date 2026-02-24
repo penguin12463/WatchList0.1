@@ -64,8 +64,8 @@
   </div>
   <script type="module" src="./app.js?v=20260224d"></script>
   <script src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"></script>
-  <script type="module">
-    import { CLERK_PUBLISHABLE_KEY } from './config.js';
+  <script>
+    const CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsud2F0Y2hseXN0LmNvLnVrJA";
     window.Clerk.load({ publishableKey: CLERK_PUBLISHABLE_KEY }).then(() => {
       Clerk.mountSignIn('#clerk-sign-in');
     });

@@ -20,3 +20,6 @@ obj/
 # Supabase CLI local metadata
 supabase/.temp/
 supabase/
+neon-worker/node_modules/
+neon-worker/.wrangler/
+neon-worker/.dev.vars

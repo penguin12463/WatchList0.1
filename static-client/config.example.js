@@ -1,3 +1,3 @@
 // Copy to config.js and fill values.
-export const SUPABASE_URL = "https://<project-ref>.supabase.co";
-export const SUPABASE_PUBLISHABLE_KEY = "<publishable-key>";
+export const CLERK_PUBLISHABLE_KEY = "pk_test_...";
+export const WORKER_API_BASE_URL = "https://<your-worker-subdomain>.workers.dev";

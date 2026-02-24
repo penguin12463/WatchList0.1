@@ -1,0 +1,6 @@
+name = "watchlyst-neon-api"
+main = "src/index.ts"
+compatibility_date = "2026-02-24"
+
+[vars]
+CORS_ORIGIN = "https://watchlyst.co.uk"

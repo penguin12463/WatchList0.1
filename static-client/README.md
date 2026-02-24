@@ -11,7 +11,7 @@ This is the static-host migration target that preserves current features:
 ## Configure
 1. Copy values into `config.js` from Supabase project settings:
    - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_PUBLISHABLE_KEY`
 2. Run `migration/supabase/schema.sql` in Supabase SQL editor.
 3. Deploy edge function in `migration/functions/tmdb-proxy/index.ts` and set secrets.
 

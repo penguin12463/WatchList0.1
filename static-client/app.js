@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20260223j";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=20260224a";
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -186,7 +186,7 @@ async function completeSignInOrThrow(sessionCandidate = null) {
   window.location.replace("./");
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -293,7 +293,7 @@ async function restSignUp(email, password, username) {
     mode: "cors",
     credentials: "omit",
     headers: {
-      apikey: SUPABASE_ANON_KEY,
+      apikey: SUPABASE_PUBLISHABLE_KEY,
       "content-type": "application/json"
     },
     body: JSON.stringify({
@@ -763,7 +763,7 @@ async function initAppPage() {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
         authorization: `Bearer ${token}`
       },
       body: JSON.stringify(payload)
@@ -1056,7 +1056,7 @@ async function initAppPage() {
 
 (async () => {
   try {
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       setStatus("Missing Supabase config values.", true);
       return;
     }

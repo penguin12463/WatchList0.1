@@ -1,42 +1,4 @@
-import { Clerk } from "https://esm.sh/@clerk/clerk-js";
-import { CLERK_PUBLISHABLE_KEY, WORKER_API_BASE_URL } from "./config.js";
-
-const page = document.body.dataset.page;
-const statusEl = document.getElementById("status");
-
-let clerk = null;
-let activeList = null;
-let lists = [];
-let resetSignIn = null;
-
-const whoamiEl = document.getElementById("whoami");
-const logoutBtn = document.getElementById("logout-btn");
-const signinTopLink = document.getElementById("signin-top-link");
-const signupTopLink = document.getElementById("signup-top-link");
-
-const signedOutPanel = document.getElementById("signed-out-panel");
-const appPanel = document.getElementById("app");
-
-const authErrorEl = document.getElementById("auth-error");
-const listsEl = document.getElementById("lists");
-const moviesEl = document.getElementById("movies");
-const currentListTitleEl = document.getElementById("current-list-title");
-
-const newListForm = document.getElementById("new-list-form");
-const newListNameInput = document.getElementById("new-list-name");
-
-const ownerActionsEl = document.getElementById("owner-actions");
-const renameForm = document.getElementById("rename-form");
-const renameInput = document.getElementById("rename-input");
-const inviteForm = document.getElementById("invite-form");
-const inviteUsernameInput = document.getElementById("invite-username");
-const sharedUsersEl = document.getElementById("shared-users");
-
-const addMovieForm = document.getElementById("add-movie-form");
-const movieTitleInput = document.getElementById("movie-title-input");
-
-const spotlightToggle = document.getElementById("spotlight-toggle");
-const contentSurface = document.getElementById("content-surface");
+// ...existing code...
 
 function showStatus(message, isError = false) {
   if (!statusEl) return;
@@ -104,7 +66,8 @@ function getErrorMessage(error, fallback = "Request failed") {
   const clerkErrors = error?.errors;
   if (Array.isArray(clerkErrors) && clerkErrors.length) {
     const first = clerkErrors[0];
-    return first?.longMessage || first?.message || fallback;
+    const code = first?.code ? ` (${first.code})` : "";
+    return (first?.longMessage || first?.message || fallback) + code;
   }
 
   return error?.message || fallback;
@@ -401,14 +364,32 @@ async function forceSignedOutState() {
   showStatus("Please sign in.");
 }
 
-async function initializeClerk() {
-  if (!CLERK_PUBLISHABLE_KEY) {
-    throw new Error("Missing CLERK_PUBLISHABLE_KEY in static-client/config.js");
-  }
-
-  clerk = new Clerk(CLERK_PUBLISHABLE_KEY);
-  await clerk.load();
+// Clerk hosted sign-in integration
+function checkClerkSession() {
+  // Clerk sets session cookie after hosted sign-in
+  // Use Clerk's frontend SDK or backend API to validate session
+  // Example: fetch /v1/user or /v1/session from Clerk API
+  fetch('https://api.clerk.com/v1/user', {
+    credentials: 'include',
+    headers: {
+      'Authorization': `Bearer ${CLERK_PUBLISHABLE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  })
+    .then(res => res.ok ? res.json() : null)
+    .then(user => {
+      if (user && user.id) {
+        setGlobalAuthUi(true, user.first_name || user.email_address || '');
+      } else {
+        setGlobalAuthUi(false);
+      }
+    })
+    .catch(() => setGlobalAuthUi(false));
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+  checkClerkSession();
+});
 
 async function initSigninPage() {
   const signinForm = document.getElementById("signin-form");
@@ -427,11 +408,34 @@ async function initSigninPage() {
     const email = document.getElementById("signin-email")?.value?.trim();
     const password = document.getElementById("signin-password")?.value;
 
+    if (!email || !password) {
+      showAuthError("Enter your email and password.");
+      return;
+    }
+
     try {
-      const signIn = await clerk.client.signIn.create({
-        identifier: email,
-        password,
-      });
+      let signIn;
+
+      try {
+        signIn = await clerk.client.signIn.create({
+          strategy: "password",
+          identifier: email,
+          password,
+        });
+      } catch (primaryError) {
+        const first = primaryError?.errors?.[0];
+        const shouldFallback =
+          first?.code === "form_param_unknown" ||
+          first?.code === "form_param_value_invalid" ||
+          first?.code === "strategy_for_user_invalid";
+
+        if (!shouldFallback) throw primaryError;
+
+        signIn = await clerk.client.signIn.create({
+          identifier: email,
+          password,
+        });
+      }
 
       if (signIn.status !== "complete" || !signIn.createdSessionId) {
         throw new Error("Sign-in not completed.");

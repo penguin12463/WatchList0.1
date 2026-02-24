@@ -53,44 +53,22 @@
       </div>
 
       <article class="content auth-content" id="content-surface">
-        <section class="auth-form-shell">
+        <section class="auth-form-shell" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 400px;">
           <h1>Sign In</h1>
-          <div id="auth-error" class="auth-error hidden"></div>
-
-          <form id="signin-form" class="stack" style="margin-top: 14px; max-width: 520px;">
-            <div class="mb-3">
-              <label class="form-label" for="signin-email">Email</label>
-              <input id="signin-email" class="form-control" type="text" placeholder="Email" required />
-            </div>
-            <div class="mb-3">
-              <label class="form-label" for="signin-password">Password</label>
-              <input id="signin-password" class="form-control" type="password" placeholder="Password" required minlength="8" />
-            </div>
-            <button id="signin-submit" class="btn btn-primary" type="submit">Sign In</button>
-          </form>
-
-          <p class="hint" style="margin-top:10px;">
-            <button id="forgot-password-btn" type="button" class="forgot-link-btn">Forgot password?</button>
-          </p>
-
-          <form id="reset-form" class="stack hidden" style="margin-top: 14px; max-width: 520px;">
-            <div class="mb-3">
-              <label class="form-label" for="reset-password">New Password</label>
-              <input id="reset-password" class="form-control" type="password" placeholder="New Password" required minlength="8" />
-            </div>
-            <div class="mb-3">
-              <label class="form-label" for="reset-confirm-password">Confirm New Password</label>
-              <input id="reset-confirm-password" class="form-control" type="password" placeholder="Confirm New Password" required minlength="8" />
-            </div>
-            <button id="reset-submit" class="btn btn-primary" type="submit">Update Password</button>
-          </form>
-
-          <p class="hint" style="margin-top:14px;">Don't have an account? <a href="./signup.html"><strong>Sign Up</strong></a></p>
-          <p id="status"></p>
+          <div style="width: 100%; max-width: 420px; margin: 0 auto;">
+            <div id="clerk-sign-in"></div>
+          </div>
         </section>
       </article>
     </main>
   </div>
-  <script type="module" src="./app.js?v=20260224c"></script>
+  <script type="module" src="./app.js?v=20260224d"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"></script>
+  <script type="module">
+    import { CLERK_PUBLISHABLE_KEY } from './config.js';
+    window.Clerk.load({ publishableKey: CLERK_PUBLISHABLE_KEY }).then(() => {
+      Clerk.mountSignIn('#clerk-sign-in');
+    });
+  </script>
 </body>
 </html>

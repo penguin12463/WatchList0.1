@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Watchlyst Static</title>
+  <title>Watchlyst — Settings</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="./styles.css?v=20260225i" />
 </head>
-<body data-page="app">
+<body data-page="settings">
   <div class="page">
+
+    <!-- ── Sidebar ── -->
     <aside class="sidebar">
       <div class="top-row sidebar-top">
         <a class="logo-link" href="./" aria-label="Watchlyst home">
@@ -29,13 +31,8 @@
 
       <div class="nav-scrollable">
         <nav class="nav">
+          <!-- Populated by js/settings.js -->
           <div id="lists"></div>
-          <div class="nav-item">
-            <form id="new-list-form" class="new-list-form">
-              <input id="new-list-name" type="text" placeholder="New List" maxlength="50" />
-              <button type="submit" class="new-list-btn"><span class="bi bi-plus-square-fill"></span>New List</button>
-            </form>
-          </div>
         </nav>
 
         <div class="nav-footer">
@@ -51,69 +48,44 @@
       </div>
     </aside>
 
+    <!-- ── Main ── -->
     <main>
       <div class="top-row top-auth-row">
         <div class="top-auth-content">
           <span id="whoami"></span>
-          <a id="signin-top-link" class="nav-link hidden" href="https://accounts.watchlyst.co.uk/sign-in?redirect_url=https://watchlyst.co.uk/"><strong>Sign In</strong></a>
+          <a id="signin-top-link" class="nav-link hidden"
+             href="https://accounts.watchlyst.co.uk/sign-in?redirect_url=https://watchlyst.co.uk/">
+            <strong>Sign In</strong>
+          </a>
           <button id="logout-btn" type="button" class="hidden">Logout</button>
         </div>
       </div>
 
       <article class="content" id="content-surface">
-        <section id="signed-out-panel" class="auth-wrap card hidden">
+        <!-- Signed-out fallback -->
+        <section id="signed-out-panel" class="hidden">
           <div class="signed-out-box">
             <img src="./images/person.png" alt="User" class="signed-out-user-icon" />
             <h1>Please sign in!</h1>
-            <div class="inline" style="justify-content:center; margin-top:20px;">
-              <a class="auth-link-btn" href="https://accounts.watchlyst.co.uk/sign-in?redirect_url=https://watchlyst.co.uk/">Sign In</a>
+            <div style="display:flex;justify-content:center;margin-top:20px;">
+              <a class="auth-link-btn"
+                 href="https://accounts.watchlyst.co.uk/sign-in?redirect_url=https://watchlyst.co.uk/">
+                Sign In
+              </a>
             </div>
           </div>
         </section>
 
-        <section id="app" class="app-content-wrap hidden">
-
-          <!-- Welcome screen — shown when no list is selected -->
-          <div id="welcome-screen" class="welcome-screen hidden">
-            <h1 id="welcome-heading"></h1>
-            <h3 id="welcome-sub"></h3>
-          </div>
-
-          <!-- List content — shown when a list is selected -->
-          <div id="list-content" class="hidden">
-
-            <!-- Title row: gear icon | list name | (empty) -->
-            <div id="title-row" class="title-row">
-              <span class="title-row-left">
-                <a id="settings-link" href="./settings.html" class="title-settings-btn" title="List settings">
-                  <span class="bi bi-gear-fill"></span>
-                </a>
-              </span>
-              <h3 id="current-list-title" class="title-row-center"></h3>
-              <span class="title-row-right"></span>
-            </div>
-
-            <div style="margin-top:20px;display:flex;flex-direction:column;align-items:center;width:100%;gap:10px;">
-              <div id="movies" style="max-width:800px;width:100%;"></div>
-
-              <form id="add-movie-form" class="add-movie-form hidden">
-                <div class="add-movie-row">
-                  <button type="submit" class="add-btn"><span class="bi bi-plus-circle-fill"></span></button>
-                  <input id="movie-title-input" type="text" placeholder="Add movie or show" maxlength="120" required autocomplete="off" />
-                </div>
-              </form>
-
-              <div id="tmdb-results" class="tmdb-results hidden"></div>
-            </div>
-
-          </div>
-        </section>
+        <!-- Settings content injected by js/settings.js -->
+        <span style="display:flex;flex-direction:column;align-items:center;margin-top:10px;">
+          <div id="settings-content"></div>
+        </span>
 
         <p id="status"></p>
       </article>
     </main>
   </div>
 
-  <script type="module" src="./js/app.js?v=20260225i"></script>
+  <script type="module" src="./js/settings.js?v=20260225i"></script>
 </body>
 </html>

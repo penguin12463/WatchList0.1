@@ -88,6 +88,28 @@ app.get("/api/lists", async (c) => {
   return c.json(rows);
 });
 
+// Single-list info — includes owner_username for shared/invited views
+app.get("/api/lists/:id/info", async (c) => {
+  const userId = c.get("userId");
+  const listId = Number(c.req.param("id"));
+  const sql = db(c.env);
+
+  const rows = await sql`
+    select v.id, v.name, v.owner_id, v.access_type,
+           p.username as owner_username
+    from public.v_user_watchlists v
+    join public.profiles p on p.id = v.owner_id
+    where v.id = ${listId} and v.user_id = ${userId}
+    limit 1
+  `;
+
+  if (!rows.length) {
+    return c.json({ error: "List not found or inaccessible" }, 404);
+  }
+
+  return c.json(rows[0]);
+});
+
 app.post("/api/lists", async (c) => {
   const userId = c.get("userId");
   const body = await c.req.json<{ name?: string }>();

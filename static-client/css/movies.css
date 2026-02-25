@@ -1,0 +1,200 @@
+/* ═══════════════════════════════════════════════════
+   MOVIES  —  Movie list, items (view + edit), TMDB search
+═══════════════════════════════════════════════════ */
+
+/* ════════════════════════
+   Movie list container
+════════════════════════ */
+
+/* Matches original: border, border-radius, no gap between items */
+.movie-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: stretch;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* ════════════════════════
+   Individual movie item
+════════════════════════ */
+
+/* Matches original: flex row, gap 5px, padding 5px 10px, no margin */
+.movie-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  margin: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.movie-item:first-child {
+  border-top: none;
+}
+
+/* Bullet dot — scale:0.5 keeps it small */
+.movie-dot {
+  flex-shrink: 0;
+  font-size: 0.5rem; /* scale:0.5 equivalent */
+  line-height: 1;
+  vertical-align: top;
+}
+
+/* Title span */
+.movie-title {
+  /* inherits body font — no special styling in original */
+}
+
+/* Metadata (type icon + watched/total) */
+.movie-meta {
+  color: #000;
+  font-size: 0.95em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+/* Star rating */
+.movie-rating {
+  color: #000;
+  font-size: 0.95em;
+}
+
+/* Edit button — link style, pen icon in blue with black outline */
+.movie-item-edit-btn {
+  margin-left: auto;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer;
+  padding: 0.15rem 0.3rem;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.movie-item-edit-btn .bi-pen-fill {
+  vertical-align: top;
+  font-size: 1rem;
+  color: #60a5fa;
+  text-shadow: -1px 0 #000, 0 1px #000, 1px 0 #000, 0 -1px #000;
+}
+
+/* ════════════════════════
+   Edit mode row
+════════════════════════ */
+
+/* Full-width flex row with inputs: title | type | watched / total | rating | ✓ ✗ 🗑 */
+.movie-item-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+
+/* Width/padding overrides for compact inline inputs (match original) */
+.movie-item-edit-row .edit-title-input {
+  width: 140px;
+  min-width: 140px;
+  flex: 0 0 140px;
+  padding: 0 5px;
+}
+
+.movie-item-edit-row .edit-type-select {
+  width: auto;
+  min-width: 110px;
+  padding: 0 5px;
+}
+
+.movie-item-edit-row .edit-num-input {
+  width: 110px;
+  padding: 0 5px;
+}
+
+.movie-item-edit-row .edit-rating-select {
+  width: auto;
+  min-width: 100px;
+  padding: 0 5px;
+}
+
+/* ─ compact action buttons ─ */
+.edit-action-btn {
+  padding: 0 5px !important;
+}
+
+/* ════════════════════════
+   Add-movie form
+════════════════════════ */
+
+/* Wrapper: max-width 800px, centred, small top margin */
+.add-movie-form {
+  width: 100%;
+  max-width: 800px;
+  margin: 10px auto 0;
+}
+
+.add-movie-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.add-submit-btn {
+  padding: 0.25rem 0.5rem;
+  flex-shrink: 0;
+}
+
+.add-title-input {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+/* ════════════════════════
+   TMDB autocomplete dropdown
+════════════════════════ */
+
+.tmdb-results {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.tmdb-result-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.tmdb-result-item:last-child {
+  border-bottom: none;
+}
+
+.tmdb-result-item:hover {
+  background: #f5f5f5;
+}
+
+.tmdb-result-item .tmdb-year {
+  color: #888;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  margin-left: auto;
+}

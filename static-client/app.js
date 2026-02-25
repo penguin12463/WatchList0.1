@@ -28,6 +28,7 @@ const currentListTitleEl = document.getElementById("current-list-title");
 let clerk = null;
 let lists = [];
 let activeList = null;
+let appInitialized = false;
 const page = document.body?.dataset?.page || "app";
 
 async function initializeClerk() {
@@ -573,6 +574,7 @@ async function initAppPage() {
     return;
   }
 
+  appInitialized = true;
   const identity = getCurrentUserIdentity();
   setGlobalAuthUi(true, identity.username || identity.email);
 
@@ -705,6 +707,18 @@ async function main() {
     }
 
     await initAppPage();
+
+    // Clerk may process the redirect handshake token asynchronously after
+    // load() returns. addListener fires when the session settles, so we
+    // catch the case where clerk.user was null on the first check.
+    clerk.addListener(async ({ user }) => {
+      if (user && !appInitialized) {
+        await initAppPage();
+      } else if (!user && appInitialized) {
+        appInitialized = false;
+        setGlobalAuthUi(false);
+      }
+    });
   } catch (error) {
     const message = getErrorMessage(error, "App failed to initialize");
     showAuthError(message);

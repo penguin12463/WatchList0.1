@@ -32,7 +32,7 @@ let activeList = null;
 const page = document.body?.dataset?.page || "app";
 
 async function initializeClerk() {
-  if (!document.querySelector('script[src*="clerk.browser.js"]')) {
+  if (!window.Clerk) {
     await new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
@@ -41,8 +41,8 @@ async function initializeClerk() {
       document.head.appendChild(script);
     });
   }
-  clerk = new window.Clerk(CLERK_PUBLISHABLE_KEY);
-  await clerk.load();
+  await window.Clerk.load({ publishableKey: CLERK_PUBLISHABLE_KEY });
+  clerk = window.Clerk;
 }
 
 function showStatus(message, isError = false) {

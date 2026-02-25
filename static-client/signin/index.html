@@ -4,10 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Watchlyst - Sign In</title>
-  <meta http-equiv="refresh" content="0; url=/signin.html" />
+  <meta http-equiv="refresh" content="0; url=https://accounts.watchlyst.co.uk/sign-in?redirect_url=https://watchlyst.co.uk/" />
   <script>
-    const target = `/signin.html${window.location.search || ""}${window.location.hash || ""}`;
-    window.location.replace(target);
+    window.location.replace('https://accounts.watchlyst.co.uk/sign-in?redirect_url=' + encodeURIComponent(window.location.origin + '/'));
   </script>
 </head>
 <body>

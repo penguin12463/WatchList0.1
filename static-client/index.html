@@ -85,8 +85,8 @@
             <!-- Title row: gear icon | list name | (empty) -->
             <div id="title-row" class="title-row">
               <span class="title-row-left">
-                <a id="settings-link" href="./settings.html" class="title-settings-btn" title="List settings">
-                  <span class="bi bi-gear-fill"></span>
+                <a id="settings-link" href="./settings.html" class="title-settings-btn" title="List settings" style="justify-self:start;">
+                  <span class="bi bi-gear-fill" style="vertical-align:top;scale:1.5;"></span>
                 </a>
               </span>
               <h3 id="current-list-title" class="title-row-center"></h3>
@@ -98,8 +98,8 @@
 
               <form id="add-movie-form" class="add-movie-form hidden">
                 <div class="add-movie-row">
-                  <button type="submit" class="add-btn"><span class="bi bi-plus-circle-fill"></span></button>
-                  <input id="movie-title-input" type="text" placeholder="Add movie or show" maxlength="120" required autocomplete="off" />
+                  <button type="submit" class="btn btn-primary" style="padding:0.25rem 0.5rem;"><span class="bi bi-plus-circle-fill" style="vertical-align:top;"></span></button>
+                  <input id="movie-title-input" type="text" class="form-control" placeholder="Add a movie..." maxlength="120" required autocomplete="off" style="flex:1 1 0%;min-width:0;" />
                 </div>
               </form>
 

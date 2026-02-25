@@ -42,9 +42,10 @@ export function buildMovieItem(movie) {
   const isMovie = movie.media_type === "movie";
 
   if (isMovie || isTV) {
-    const icon = document.createElement("i");
-    icon.className = isTV ? "bi bi-display" : "bi bi-film";
-    icon.style.cssText = "width:1.1em;height:auto;vertical-align:middle;";
+    const icon = document.createElement("img");
+    icon.src = isTV ? "./images/episodes.png" : "./images/clapperboard.png";
+    icon.loading = "lazy";
+    icon.style.cssText = "width:auto;height:1.1em;vertical-align:middle;";
 
     metaSpan.append(" - ");
     metaSpan.appendChild(icon);
@@ -273,6 +274,12 @@ export function renderMovies(movies = [], moviesEl) {
 }
 
 export async function loadMovies(listId, moviesEl) {
+  if (moviesEl) {
+    moviesEl.innerHTML = "";
+    const loading = document.createElement("h4");
+    loading.textContent = "Loading watchlist...";
+    moviesEl.appendChild(loading);
+  }
   const rows = await apiFetch(`/api/lists/${listId}/movies`);
   renderMovies(Array.isArray(rows) ? rows : [], moviesEl);
 }

@@ -97,6 +97,9 @@ async function renderSettings() {
     return;
   }
 
+  // Show loading state while fetching
+  settingsContent.innerHTML = "<h3>Loading settings...</h3>";
+
   // Fetch list info
   let listInfo;
   try {

@@ -8,6 +8,7 @@ type Env = {
   DATABASE_URL: string;
   CLERK_SECRET_KEY: string;
   CORS_ORIGIN?: string;
+  TMDB_API_KEY?: string;
 };
 
 type Variables = {
@@ -216,6 +217,10 @@ app.patch("/api/movies/:id", async (c) => {
   const userId = c.get("userId");
   const movieId = Number(c.req.param("id"));
   const body = await c.req.json<{
+    title?: string | null;
+    media_type?: string | null;
+    runtime?: number | null;
+    number_of_episodes?: number | null;
     watched_runtime?: number | null;
     watched_episodes?: number | null;
     rating?: number | null;
@@ -225,7 +230,11 @@ app.patch("/api/movies/:id", async (c) => {
 
   const rows = await sql`
     update public.movies m
-    set watched_runtime = ${body.watched_runtime ?? null},
+    set title = coalesce(${body.title ?? null}, title),
+        media_type = coalesce(${body.media_type ?? null}, media_type),
+        runtime = ${body.runtime ?? null},
+        number_of_episodes = ${body.number_of_episodes ?? null},
+        watched_runtime = ${body.watched_runtime ?? null},
         watched_episodes = ${body.watched_episodes ?? null},
         rating = ${body.rating ?? null}
     where m.id = ${movieId}
@@ -236,14 +245,15 @@ app.patch("/api/movies/:id", async (c) => {
         where wm.movie_id = m.id
           and public.is_watchlist_accessible(w.id, ${userId})
       )
-    returning m.id
+    returning m.id, m.title, m.media_type, m.runtime, m.number_of_episodes,
+              m.watched_runtime, m.watched_episodes, m.rating
   `;
 
   if (!rows.length) {
     return c.json({ error: "Movie not found or inaccessible" }, 404);
   }
 
-  return c.json({ ok: true });
+  return c.json(rows[0]);
 });
 
 app.delete("/api/lists/:listId/movies/:movieId", async (c) => {
@@ -316,6 +326,68 @@ app.post("/api/lists/:id/decline", async (c) => {
   const sql = db(c.env);
   await sql`select public.decline_invitation(${listId}, ${userId})`;
   return c.json({ ok: true });
+});
+
+// ── TMDB proxy ──
+
+const TMDB_BASE = "https://api.themoviedb.org/3";
+
+app.get("/api/tmdb/search", async (c) => {
+  const apiKey = c.env.TMDB_API_KEY;
+  if (!apiKey) return c.json({ results: [] });
+  const q = (c.req.query("q") || "").trim();
+  if (!q) return c.json({ results: [] });
+
+  const url = `${TMDB_BASE}/search/multi?api_key=${apiKey}&query=${encodeURIComponent(q)}&include_adult=false&page=1`;
+  const resp = await fetch(url);
+  if (!resp.ok) return c.json({ results: [] });
+  const data: any = await resp.json();
+
+  const results = (data.results || [])
+    .filter((r: any) => r.media_type === "movie" || r.media_type === "tv")
+    .slice(0, 8)
+    .map((r: any) => ({
+      id: r.id,
+      media_type: r.media_type,
+      title: r.media_type === "movie" ? r.title : r.name,
+      year: r.media_type === "movie"
+        ? (r.release_date || "").slice(0, 4)
+        : (r.first_air_date || "").slice(0, 4),
+    }));
+
+  return c.json({ results });
+});
+
+app.get("/api/tmdb/movie/:id", async (c) => {
+  const apiKey = c.env.TMDB_API_KEY;
+  if (!apiKey) return c.json({ error: "No TMDB key" }, 503);
+  const tmdbId = c.req.param("id");
+  const url = `${TMDB_BASE}/movie/${tmdbId}?api_key=${apiKey}`;
+  const resp = await fetch(url);
+  if (!resp.ok) return c.json({ error: "TMDB error" }, 502);
+  const data: any = await resp.json();
+  return c.json({
+    id: data.id,
+    title: data.title,
+    runtime: data.runtime || null,
+    release_date: (data.release_date || "").slice(0, 4),
+  });
+});
+
+app.get("/api/tmdb/tv/:id", async (c) => {
+  const apiKey = c.env.TMDB_API_KEY;
+  if (!apiKey) return c.json({ error: "No TMDB key" }, 503);
+  const tmdbId = c.req.param("id");
+  const url = `${TMDB_BASE}/tv/${tmdbId}?api_key=${apiKey}`;
+  const resp = await fetch(url);
+  if (!resp.ok) return c.json({ error: "TMDB error" }, 502);
+  const data: any = await resp.json();
+  return c.json({
+    id: data.id,
+    name: data.name,
+    number_of_episodes: data.number_of_episodes || null,
+    first_air_date: (data.first_air_date || "").slice(0, 4),
+  });
 });
 
 export default app;

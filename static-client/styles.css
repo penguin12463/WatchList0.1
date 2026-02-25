@@ -563,6 +563,147 @@ button.secondary {
 
 .hidden { display: none !important; }
 
+/* ── Movie list ── */
+.movie-list {
+	border: 1px solid currentColor;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.65);
+	overflow: visible;
+}
+
+.movie-list .movie-item {
+	border: none;
+	border-top: 1px solid rgba(0,0,0,0.12);
+	border-radius: 0;
+	margin-bottom: 0;
+	padding: 0.55rem 0.7rem;
+}
+
+.movie-list .movie-item:first-child {
+	border-top: none;
+}
+
+.movie-list .movie-item:hover {
+	background: rgba(0,0,0,0.04);
+	border-color: rgba(0,0,0,0.12) !important;
+}
+
+.movie-item-view {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.movie-item-dot {
+	font-size: 0.45rem;
+	color: #555;
+	flex-shrink: 0;
+}
+
+.movie-item-title {
+	flex: 1;
+	font-weight: 500;
+	min-width: 120px;
+}
+
+.movie-item-progress {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	font-size: 0.85rem;
+	color: #555;
+	white-space: nowrap;
+}
+
+.movie-item-stars {
+	color: #e0a800;
+	font-size: 0.9rem;
+	white-space: nowrap;
+}
+
+.movie-item-edit-btn {
+	background: transparent;
+	border: none;
+	color: #555;
+	padding: 0.2rem 0.35rem;
+	cursor: pointer;
+	border-radius: 4px;
+}
+
+.movie-item-edit-btn:hover {
+	background: rgba(0,0,0,0.08);
+	color: #000;
+}
+
+.movie-item-edit-form {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	align-items: center;
+	margin-top: 0.5rem;
+}
+
+.movie-item-edit-form input,
+.movie-item-edit-form select {
+	padding: 0.3rem 0.5rem;
+	font-size: 0.9rem;
+}
+
+.movie-item-edit-form .title-input {
+	flex: 1;
+	min-width: 140px;
+}
+
+.movie-item-edit-form .num-input {
+	width: 72px;
+}
+
+.movie-item-edit-form .action-btn {
+	padding: 0.3rem 0.55rem;
+}
+
+.movie-item-edit-form .action-btn.delete-btn {
+	background: #b42323;
+	border-color: #8f1515;
+}
+
+/* ── TMDB search results ── */
+.tmdb-results {
+	border: 1px solid #ccc;
+	border-radius: 6px;
+	background: #fff;
+	box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+	max-height: 260px;
+	overflow-y: auto;
+	margin-top: -0.5rem;
+	margin-bottom: 0.5rem;
+}
+
+.tmdb-result-item {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 0.75rem;
+	cursor: pointer;
+	font-size: 0.9rem;
+	border-bottom: 1px solid #f0f0f0;
+}
+
+.tmdb-result-item:last-child {
+	border-bottom: none;
+}
+
+.tmdb-result-item:hover {
+	background: #f5f5f5;
+}
+
+.tmdb-result-item .tmdb-year {
+	color: #888;
+	font-size: 0.8rem;
+	white-space: nowrap;
+}
+
 @media (max-width: 900px) {
 	.page {
 		flex-direction: column;

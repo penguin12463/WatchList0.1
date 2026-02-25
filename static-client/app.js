@@ -23,12 +23,15 @@ const movieTitleInput = document.getElementById("movie-title-input");
 const ownerActionsEl = document.getElementById("owner-actions");
 const sharedUsersEl = document.getElementById("shared-users");
 const currentListTitleEl = document.getElementById("current-list-title");
+const tmdbResultsEl = document.getElementById("tmdb-results");
 
 // App state
 let clerk = null;
 let lists = [];
 let activeList = null;
 let appInitialized = false;
+let tmdbSearchTimer = null;
+let tmdbSelected = null;
 const page = document.body?.dataset?.page || "app";
 
 async function initializeClerk() {
@@ -195,28 +198,257 @@ async function ensureProfile() {
 
 function renderLists() {
   if (!listsEl) return;
-
   listsEl.innerHTML = "";
 
   for (const list of lists) {
     const item = document.createElement("div");
-    item.className = "nav-item";
+    item.className = "nav-item list-item";
+    item.style.display = "flex";
+    item.style.alignItems = "center";
+    item.style.gap = "0.3rem";
 
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "nav-link";
-    if (activeList?.id === list.id) {
-      button.classList.add("active");
+    if (list.access_type === "invited") {
+      // Pending invitation — cannot select, must accept/decline first
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "nav-link";
+      nameSpan.style.fontStyle = "italic";
+      nameSpan.style.flex = "1";
+      nameSpan.textContent = list.name;
+
+      const badge = document.createElement("span");
+      badge.className = "role-badge pending-share-icon";
+      badge.title = "Pending invitation";
+      badge.innerHTML = '<i class="bi bi-envelope-fill"></i>';
+
+      const acceptBtn = document.createElement("button");
+      acceptBtn.type = "button";
+      acceptBtn.className = "secondary";
+      acceptBtn.style.cssText = "padding:0.15rem 0.45rem;font-size:0.78rem;";
+      acceptBtn.textContent = "Accept";
+      acceptBtn.addEventListener("click", () => acceptInvitation(list));
+
+      const declineBtn = document.createElement("button");
+      declineBtn.type = "button";
+      declineBtn.className = "danger";
+      declineBtn.style.cssText = "padding:0.15rem 0.45rem;font-size:0.78rem;";
+      declineBtn.textContent = "Decline";
+      declineBtn.addEventListener("click", () => declineInvitation(list));
+
+      item.append(nameSpan, badge, acceptBtn, declineBtn);
+    } else {
+      // Owner or shared — clickable
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "nav-link";
+      button.style.flex = "1";
+      button.style.textAlign = "left";
+      if (activeList?.id === list.id) button.classList.add("active");
+      button.textContent = list.name;
+      button.addEventListener("click", () => selectList(list));
+
+      item.appendChild(button);
+
+      if (list.access_type === "shared") {
+        const badge = document.createElement("span");
+        badge.className = "role-badge";
+        badge.textContent = "shared";
+        item.appendChild(badge);
+      }
+
+      const actionBtn = document.createElement("button");
+      actionBtn.type = "button";
+      actionBtn.title = list.access_type === "owner" ? "Delete list" : "Leave list";
+      actionBtn.style.cssText = "padding:0.2rem 0.4rem;font-size:0.85rem;flex-shrink:0;";
+      actionBtn.innerHTML = list.access_type === "owner"
+        ? '<i class="bi bi-trash"></i>'
+        : '<i class="bi bi-box-arrow-right"></i>';
+      actionBtn.className = list.access_type === "owner" ? "danger" : "secondary";
+      actionBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteOrLeaveList(list);
+      });
+
+      item.appendChild(actionBtn);
     }
 
-    button.textContent = list.name;
-    button.addEventListener("click", () => {
-      selectList(list);
-    });
-
-    item.appendChild(button);
     listsEl.appendChild(item);
   }
+}
+
+function buildMovieItem(movie) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "movie-item";
+
+  // ── View mode ──
+  const viewEl = document.createElement("div");
+  viewEl.className = "movie-item-view";
+
+  const dot = document.createElement("i");
+  dot.className = "bi bi-circle-fill movie-item-dot";
+
+  const titleSpan = document.createElement("span");
+  titleSpan.className = "movie-item-title";
+  titleSpan.textContent = movie.title;
+
+  const progressEl = document.createElement("span");
+  progressEl.className = "movie-item-progress";
+  const isTV = movie.media_type === "tv";
+  const typeIcon = document.createElement("i");
+  typeIcon.className = isTV ? "bi bi-display" : "bi bi-film";
+  progressEl.appendChild(typeIcon);
+
+  const makeProgressText = (m) => {
+    const tv = m.media_type === "tv";
+    if (tv) {
+      const w = m.watched_episodes ?? 0;
+      const t = m.number_of_episodes;
+      return t ? ` ${w} / ${t} ep` : (w ? ` ${w} ep` : "");
+    } else {
+      const w = m.watched_runtime ?? 0;
+      const t = m.runtime;
+      return t ? ` ${w} / ${t} min` : (w ? ` ${w} min` : "");
+    }
+  };
+
+  const progressText = makeProgressText(movie);
+  if (progressText) progressEl.appendChild(document.createTextNode(progressText));
+
+  const starsEl = document.createElement("span");
+  starsEl.className = "movie-item-stars";
+  const rating = movie.rating || 0;
+  starsEl.textContent = "\u2605".repeat(rating) + "\u2606".repeat(5 - rating);
+
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "movie-item-edit-btn";
+  editBtn.title = "Edit";
+  editBtn.innerHTML = '<i class="bi bi-pen-fill"></i>';
+
+  viewEl.append(dot, titleSpan, progressEl, starsEl, editBtn);
+
+  // ── Edit mode ──
+  const editEl = document.createElement("div");
+  editEl.className = "movie-item-edit-form hidden";
+
+  const titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.className = "title-input";
+  titleInput.value = movie.title;
+  titleInput.maxLength = 120;
+
+  const typeSelect = document.createElement("select");
+  typeSelect.innerHTML = `<option value="movie"${!isTV ? " selected" : ""}>Movie</option><option value="tv"${isTV ? " selected" : ""}>TV</option>`;
+
+  const watchedLabel = document.createElement("span");
+  watchedLabel.style.cssText = "font-size:0.85rem;color:#555;";
+
+  const watchedInput = document.createElement("input");
+  watchedInput.type = "number";
+  watchedInput.className = "num-input";
+  watchedInput.min = "0";
+
+  const totalSep = document.createElement("span");
+  totalSep.textContent = "/";
+  totalSep.style.cssText = "font-size:0.85rem;color:#555;";
+
+  const totalInput = document.createElement("input");
+  totalInput.type = "number";
+  totalInput.className = "num-input";
+  totalInput.min = "0";
+
+  const syncEditFields = (currentMovie) => {
+    const nowTV = typeSelect.value === "tv";
+    watchedLabel.textContent = nowTV ? "Ep watched" : "Min watched";
+    watchedInput.value = nowTV
+      ? String(currentMovie.watched_episodes ?? "")
+      : String(currentMovie.watched_runtime ?? "");
+    totalInput.value = nowTV
+      ? String(currentMovie.number_of_episodes ?? "")
+      : String(currentMovie.runtime ?? "");
+    totalInput.placeholder = nowTV ? "Total ep" : "Total min";
+  };
+
+  syncEditFields(movie);
+  typeSelect.addEventListener("change", () => syncEditFields(movie));
+
+  const ratingSelect = document.createElement("select");
+  ratingSelect.innerHTML = `<option value="">No rating</option>` +
+    [1, 2, 3, 4, 5].map((n) => `<option value="${n}"${movie.rating === n ? " selected" : ""}>${"\u2605".repeat(n)}</option>`).join("");
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "action-btn";
+  saveBtn.title = "Save";
+  saveBtn.innerHTML = '<i class="bi bi-check-lg"></i>';
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "action-btn secondary";
+  cancelBtn.title = "Cancel";
+  cancelBtn.innerHTML = '<i class="bi bi-x-lg"></i>';
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "action-btn delete-btn";
+  deleteBtn.title = "Remove from list";
+  deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+
+  editEl.append(titleInput, typeSelect, watchedLabel, watchedInput, totalSep, totalInput, ratingSelect, saveBtn, cancelBtn, deleteBtn);
+
+  // Toggle edit mode
+  editBtn.addEventListener("click", () => {
+    viewEl.classList.add("hidden");
+    editEl.classList.remove("hidden");
+    syncEditFields(movie);
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    editEl.classList.add("hidden");
+    viewEl.classList.remove("hidden");
+  });
+
+  saveBtn.addEventListener("click", async () => {
+    const nowTV = typeSelect.value === "tv";
+    const patch = {
+      title: titleInput.value.trim() || movie.title,
+      media_type: typeSelect.value,
+      watched_runtime: nowTV ? null : (Number(watchedInput.value) || null),
+      runtime: nowTV ? null : (Number(totalInput.value) || null),
+      watched_episodes: nowTV ? (Number(watchedInput.value) || null) : null,
+      number_of_episodes: nowTV ? (Number(totalInput.value) || null) : null,
+      rating: ratingSelect.value ? Number(ratingSelect.value) : null,
+    };
+    try {
+      const updated = await apiFetch(`/api/movies/${movie.id}`, { method: "PATCH", body: patch });
+      Object.assign(movie, updated);
+      const newItem = buildMovieItem(movie);
+      wrapper.replaceWith(newItem);
+    } catch (err) {
+      showStatus(getErrorMessage(err, "Unable to save"), true);
+    }
+  });
+
+  deleteBtn.addEventListener("click", async () => {
+    if (!activeList) return;
+    if (!confirm(`Remove "${movie.title}" from this list?`)) return;
+    try {
+      await apiFetch(`/api/lists/${activeList.id}/movies/${movie.id}`, { method: "DELETE" });
+      wrapper.remove();
+      const listContainer = moviesEl?.querySelector(".movie-list");
+      if (listContainer && !listContainer.querySelector(".movie-item")) {
+        listContainer.remove();
+        const empty = document.createElement("p");
+        empty.className = "hint";
+        empty.textContent = "No titles yet in this list.";
+        moviesEl.appendChild(empty);
+      }
+    } catch (err) {
+      showStatus(getErrorMessage(err, "Unable to remove"), true);
+    }
+  });
+
+  wrapper.append(viewEl, editEl);
+  return wrapper;
 }
 
 function renderMovies(movies = []) {
@@ -231,63 +463,12 @@ function renderMovies(movies = []) {
     return;
   }
 
+  const listContainer = document.createElement("div");
+  listContainer.className = "movie-list";
   for (const movie of movies) {
-    const card = document.createElement("article");
-    card.className = "movie-card";
-
-    const title = document.createElement("h4");
-    title.textContent = movie.title;
-
-    const progressWrap = document.createElement("div");
-    progressWrap.className = "inline";
-
-    const progress = document.createElement("input");
-    progress.type = "range";
-    progress.min = "0";
-    progress.max = "100";
-    progress.value = String(movie.progress_percent || 0);
-
-    const progressValue = document.createElement("span");
-    progressValue.className = "hint";
-    progressValue.textContent = `${movie.progress_percent || 0}%`;
-
-    progress.addEventListener("input", () => {
-      progressValue.textContent = `${progress.value}%`;
-    });
-
-    progress.addEventListener("change", async () => {
-      try {
-        await apiFetch(`/api/movies/${movie.id}`, {
-          method: "PATCH",
-          body: { progress_percent: Number(progress.value) },
-        });
-      } catch (error) {
-        showStatus(getErrorMessage(error, "Unable to save progress"), true);
-      }
-    });
-
-    const actions = document.createElement("div");
-    actions.className = "inline";
-
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "danger";
-    removeBtn.textContent = "Remove";
-    removeBtn.addEventListener("click", async () => {
-      try {
-        await apiFetch(`/api/lists/${activeList.id}/movies/${movie.id}`, { method: "DELETE" });
-        await loadMovies(activeList.id);
-      } catch (error) {
-        showStatus(getErrorMessage(error, "Unable to remove title"), true);
-      }
-    });
-
-    progressWrap.append(progress, progressValue);
-    actions.append(removeBtn);
-
-    card.append(title, progressWrap, actions);
-    moviesEl.appendChild(card);
+    listContainer.appendChild(buildMovieItem(movie));
   }
+  moviesEl.appendChild(listContainer);
 }
 
 async function loadMovies(listId) {
@@ -360,6 +541,41 @@ function configureListControls() {
 
   if (!hasList && sharedUsersEl) {
     sharedUsersEl.innerHTML = "";
+  }
+}
+
+async function deleteOrLeaveList(list) {
+  const isOwner = list.access_type === "owner";
+  const verb = isOwner ? "Delete" : "Leave";
+  if (!confirm(`${verb} "${list.name}"?`)) return;
+  try {
+    await apiFetch(`/api/lists/${list.id}`, { method: "DELETE" });
+    if (activeList?.id === list.id) activeList = null;
+    await loadLists();
+    showStatus(`List ${isOwner ? "deleted" : "left"}.`);
+  } catch (err) {
+    showStatus(getErrorMessage(err, `Unable to ${verb.toLowerCase()} list`), true);
+  }
+}
+
+async function acceptInvitation(list) {
+  try {
+    await apiFetch(`/api/lists/${list.id}/accept`, { method: "POST" });
+    await loadLists(list.id);
+    showStatus("Joined list.");
+  } catch (err) {
+    showStatus(getErrorMessage(err, "Unable to accept invitation"), true);
+  }
+}
+
+async function declineInvitation(list) {
+  if (!confirm(`Decline invitation to "${list.name}"?`)) return;
+  try {
+    await apiFetch(`/api/lists/${list.id}/decline`, { method: "POST" });
+    await loadLists();
+    showStatus("Invitation declined.");
+  } catch (err) {
+    showStatus(getErrorMessage(err, "Unable to decline invitation"), true);
   }
 }
 
@@ -572,6 +788,77 @@ async function initSignupPage() {
   });
 }
 
+// ── TMDB search helpers ──
+
+function hideTmdbResults() {
+  if (!tmdbResultsEl) return;
+  tmdbResultsEl.innerHTML = "";
+  tmdbResultsEl.classList.add("hidden");
+}
+
+function showTmdbResults(results) {
+  if (!tmdbResultsEl) return;
+  tmdbResultsEl.innerHTML = "";
+  if (!results.length) {
+    tmdbResultsEl.classList.add("hidden");
+    return;
+  }
+  for (const r of results) {
+    const item = document.createElement("div");
+    item.className = "tmdb-result-item";
+
+    const icon = document.createElement("i");
+    icon.className = r.media_type === "tv" ? "bi bi-display" : "bi bi-film";
+
+    const titleSpan = document.createElement("span");
+    titleSpan.style.flex = "1";
+    titleSpan.textContent = r.title;
+
+    const yearSpan = document.createElement("span");
+    yearSpan.className = "tmdb-year";
+    yearSpan.textContent = r.year || "";
+
+    item.append(icon, titleSpan, yearSpan);
+
+    item.addEventListener("mousedown", async (e) => {
+      // Prevent losing focus on the input before we finish
+      e.preventDefault();
+      try {
+        const detail = r.media_type === "tv"
+          ? await apiFetch(`/api/tmdb/tv/${r.id}`)
+          : await apiFetch(`/api/tmdb/movie/${r.id}`);
+        tmdbSelected = {
+          title: r.title,
+          media_type: r.media_type,
+          tmdb_id: r.id,
+          runtime: r.media_type === "movie" ? (detail?.runtime ?? null) : null,
+          number_of_episodes: r.media_type === "tv" ? (detail?.number_of_episodes ?? null) : null,
+        };
+      } catch {
+        tmdbSelected = { title: r.title, media_type: r.media_type, tmdb_id: r.id };
+      }
+      if (movieTitleInput) movieTitleInput.value = r.title;
+      hideTmdbResults();
+    });
+
+    tmdbResultsEl.appendChild(item);
+  }
+  tmdbResultsEl.classList.remove("hidden");
+}
+
+async function tmdbSearch(query) {
+  if (!query || query.length < 2) {
+    hideTmdbResults();
+    return;
+  }
+  try {
+    const data = await apiFetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
+    showTmdbResults(data?.results || []);
+  } catch {
+    hideTmdbResults();
+  }
+}
+
 async function initAppPage() {
   if (!clerk.user) {
     setGlobalAuthUi(false);
@@ -679,24 +966,41 @@ async function initAppPage() {
 
     if (!activeList) return;
 
-    const title = (movieTitleInput?.value || "").trim();
-    if (!title) return;
+    const typedTitle = (movieTitleInput?.value || "").trim();
+    if (!typedTitle) return;
+
+    // Use TMDB-selected data if the title still matches what the user picked
+    const body = (tmdbSelected && tmdbSelected.title === typedTitle)
+      ? { ...tmdbSelected }
+      : { title: typedTitle };
 
     try {
       await apiFetch(`/api/lists/${activeList.id}/movies`, {
         method: "POST",
-        body: { title },
+        body,
       });
 
-      if (movieTitleInput) {
-        movieTitleInput.value = "";
-      }
+      if (movieTitleInput) movieTitleInput.value = "";
+      tmdbSelected = null;
+      hideTmdbResults();
 
       await loadMovies(activeList.id);
       showStatus("Title added.");
     } catch (error) {
       showStatus(getErrorMessage(error, "Unable to add title"), true);
     }
+  });
+
+  movieTitleInput?.addEventListener("input", () => {
+    const q = (movieTitleInput.value || "").trim();
+    // clear prior selection if the user changed the text
+    if (tmdbSelected && tmdbSelected.title !== q) tmdbSelected = null;
+    clearTimeout(tmdbSearchTimer);
+    tmdbSearchTimer = setTimeout(() => tmdbSearch(q), 400);
+  });
+
+  movieTitleInput?.addEventListener("blur", () => {
+    setTimeout(hideTmdbResults, 200);
   });
 
   logoutBtn?.addEventListener("click", async () => {

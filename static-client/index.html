@@ -90,8 +90,9 @@
 
           <form id="add-movie-form" class="inline hidden movie-add-form">
             <button type="submit" class="add-btn"><span class="bi bi-plus-circle-fill"></span></button>
-            <input id="movie-title-input" type="text" placeholder="Add movie or show" maxlength="120" required />
+            <input id="movie-title-input" type="text" placeholder="Add movie or show" maxlength="120" required autocomplete="off" />
           </form>
+          <div id="tmdb-results" class="tmdb-results hidden"></div>
 
           <div id="movies"></div>
         </section>
@@ -101,6 +102,6 @@
     </main>
   </div>
 
-  <script type="module" src="./app.js?v=20260225g"></script>
+  <script type="module" src="./app.js?v=20260225h"></script>
 </body>
 </html>

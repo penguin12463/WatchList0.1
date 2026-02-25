@@ -2,7 +2,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { neon } from "@neondatabase/serverless";
-import { createClerkClient } from "@clerk/backend";
+import { verifyToken } from "@clerk/backend";
 
 type Env = {
   DATABASE_URL: string;
@@ -36,10 +36,8 @@ app.use("/api/*", async (c, next) => {
     return c.json({ error: "Missing bearer token" }, 401);
   }
 
-  const clerk = createClerkClient({ secretKey: c.env.CLERK_SECRET_KEY });
-
   try {
-    const verified = await clerk.verifyToken(token);
+    const verified = await verifyToken(token, { secretKey: c.env.CLERK_SECRET_KEY });
     const userId = String(verified.sub || "");
     if (!userId) {
       return c.json({ error: "Invalid token subject" }, 401);

@@ -100,7 +100,7 @@ function normalizeApiBase(url) {
 async function getAuthToken() {
   const session = clerk?.session;
   if (!session) return null;
-  return session.getToken();
+  return session.getToken({ skipCache: true });
 }
 
 function getErrorMessage(error, fallback = "Request failed") {
@@ -143,16 +143,20 @@ async function apiFetch(path, options = {}) {
 
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`;
+    let detail = "";
 
     try {
       const payload = await response.json();
       message = payload?.error || payload?.message || message;
+      detail = payload?.detail || "";
     } catch {
       // no-op
     }
 
     if (response.status === 401) {
-      throw new Error("Unauthorized");
+      const fullMsg = detail ? `Unauthorized: ${detail}` : "Unauthorized";
+      console.error(`[apiFetch] 401 on ${path} — ${fullMsg}`);
+      throw new Error(fullMsg);
     }
 
     throw new Error(message);

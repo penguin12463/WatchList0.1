@@ -36,12 +36,13 @@ async function initializeClerk() {
     await new Promise((resolve, reject) => {
       const script = document.createElement("script");
       script.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
+      script.setAttribute("data-clerk-publishable-key", CLERK_PUBLISHABLE_KEY);
       script.onload = resolve;
       script.onerror = reject;
       document.head.appendChild(script);
     });
   }
-  await window.Clerk.load({ publishableKey: CLERK_PUBLISHABLE_KEY });
+  await window.Clerk.load();
   clerk = window.Clerk;
 }
 

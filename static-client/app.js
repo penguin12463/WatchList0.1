@@ -369,7 +369,7 @@ async function selectList(list) {
   try {
     await Promise.all([loadMovies(list.id), loadSharedUsers(list.id)]);
   } catch (error) {
-    if (getErrorMessage(error).toLowerCase().includes("unauthorized")) {
+    if (getErrorMessage(error).toLowerCase().includes("unauthorized") && !clerk.user) {
       await forceSignedOutState();
       return;
     }
@@ -582,7 +582,7 @@ async function initAppPage() {
     await ensureProfile();
     await loadLists();
   } catch (error) {
-    if (getErrorMessage(error).toLowerCase().includes("unauthorized")) {
+    if (getErrorMessage(error).toLowerCase().includes("unauthorized") && !clerk.user) {
       await forceSignedOutState();
       return;
     }

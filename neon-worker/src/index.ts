@@ -39,7 +39,9 @@ app.use("/api/*", async (c, next) => {
   const clerk = createClerkClient({ secretKey: c.env.CLERK_SECRET_KEY });
 
   try {
-    const verified = await clerk.verifyToken(token);
+    const verified = await clerk.verifyToken(token, {
+      authorizedParties: ["https://watchlyst.co.uk", "http://localhost:8080"],
+    });
     const userId = String(verified.sub || "");
     if (!userId) {
       return c.json({ error: "Invalid token subject" }, 401);

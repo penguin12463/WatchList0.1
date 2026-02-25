@@ -41,8 +41,8 @@ async function initializeClerk() {
       document.head.appendChild(script);
     });
   }
-  await window.Clerk.load({ publishableKey: CLERK_PUBLISHABLE_KEY });
-  clerk = window.Clerk;
+  clerk = new window.Clerk(CLERK_PUBLISHABLE_KEY);
+  await clerk.load();
 }
 
 function showStatus(message, isError = false) {

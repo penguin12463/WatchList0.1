@@ -582,11 +582,23 @@ async function initAppPage() {
     await ensureProfile();
     await loadLists();
   } catch (error) {
-    if (getErrorMessage(error).toLowerCase().includes("unauthorized") && !clerk.user) {
-      await forceSignedOutState();
-      return;
+    const msg = getErrorMessage(error).toLowerCase();
+    if (msg.includes("unauthorized") || msg.includes("not authenticated")) {
+      if (!clerk.user) {
+        await forceSignedOutState();
+        return;
+      }
+      // Token may not be ready immediately after redirect — retry once
+      try {
+        await new Promise((r) => setTimeout(r, 1500));
+        await ensureProfile();
+        await loadLists();
+        return;
+      } catch (retryError) {
+        showStatus(getErrorMessage(retryError, "Failed to load app data"), true);
+        return;
+      }
     }
-
     showStatus(getErrorMessage(error, "Failed to load app data"), true);
   }
 

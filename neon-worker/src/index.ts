@@ -39,9 +39,7 @@ app.use("/api/*", async (c, next) => {
   const clerk = createClerkClient({ secretKey: c.env.CLERK_SECRET_KEY });
 
   try {
-    const verified = await clerk.verifyToken(token, {
-      authorizedParties: ["https://watchlyst.co.uk", "http://localhost:8080"],
-    });
+    const verified = await clerk.verifyToken(token);
     const userId = String(verified.sub || "");
     if (!userId) {
       return c.json({ error: "Invalid token subject" }, 401);
@@ -49,8 +47,8 @@ app.use("/api/*", async (c, next) => {
 
     c.set("userId", userId);
     await next();
-  } catch {
-    return c.json({ error: "Invalid token" }, 401);
+  } catch (err) {
+    return c.json({ error: "Invalid token", detail: String(err) }, 401);
   }
 });
 

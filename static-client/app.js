@@ -1,4 +1,49 @@
-// ...existing code...
+import { CLERK_PUBLISHABLE_KEY, WORKER_API_BASE_URL } from "./config.js";
+
+// DOM element references
+const statusEl = document.getElementById("status");
+const authErrorEl = document.getElementById("auth-error");
+const contentSurface = document.getElementById("content-surface");
+const spotlightToggle = document.getElementById("spotlight-toggle");
+const whoamiEl = document.getElementById("whoami");
+const logoutBtn = document.getElementById("logout-btn");
+const signinTopLink = document.getElementById("signin-top-link");
+const signupTopLink = document.getElementById("signup-top-link");
+const signedOutPanel = document.getElementById("signed-out-panel");
+const appPanel = document.getElementById("app");
+const listsEl = document.getElementById("lists");
+const moviesEl = document.getElementById("movies");
+const newListForm = document.getElementById("new-list-form");
+const newListNameInput = document.getElementById("new-list-name");
+const renameForm = document.getElementById("rename-form");
+const renameInput = document.getElementById("rename-input");
+const inviteForm = document.getElementById("invite-form");
+const inviteUsernameInput = document.getElementById("invite-username");
+const addMovieForm = document.getElementById("add-movie-form");
+const movieTitleInput = document.getElementById("movie-title-input");
+const ownerActionsEl = document.getElementById("owner-actions");
+const sharedUsersEl = document.getElementById("shared-users");
+const currentListTitleEl = document.getElementById("current-list-title");
+
+// App state
+let clerk = null;
+let lists = [];
+let activeList = null;
+const page = document.body?.dataset?.page || "app";
+
+async function initializeClerk() {
+  if (!document.querySelector('script[src*="clerk.browser.js"]')) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+  await window.Clerk.load({ publishableKey: CLERK_PUBLISHABLE_KEY });
+  clerk = window.Clerk;
+}
 
 function showStatus(message, isError = false) {
   if (!statusEl) return;
@@ -363,33 +408,6 @@ async function forceSignedOutState() {
   setGlobalAuthUi(false);
   showStatus("Please sign in.");
 }
-
-// Clerk hosted sign-in integration
-function checkClerkSession() {
-  // Clerk sets session cookie after hosted sign-in
-  // Use Clerk's frontend SDK or backend API to validate session
-  // Example: fetch /v1/user or /v1/session from Clerk API
-  fetch('https://api.clerk.com/v1/user', {
-    credentials: 'include',
-    headers: {
-      'Authorization': `Bearer ${CLERK_PUBLISHABLE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-  })
-    .then(res => res.ok ? res.json() : null)
-    .then(user => {
-      if (user && user.id) {
-        setGlobalAuthUi(true, user.first_name || user.email_address || '');
-      } else {
-        setGlobalAuthUi(false);
-      }
-    })
-    .catch(() => setGlobalAuthUi(false));
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  checkClerkSession();
-});
 
 async function initSigninPage() {
   const signinForm = document.getElementById("signin-form");

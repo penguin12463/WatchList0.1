@@ -8,7 +8,6 @@ const spotlightToggle = document.getElementById("spotlight-toggle");
 const whoamiEl = document.getElementById("whoami");
 const logoutBtn = document.getElementById("logout-btn");
 const signinTopLink = document.getElementById("signin-top-link");
-const signupTopLink = document.getElementById("signup-top-link");
 const signedOutPanel = document.getElementById("signed-out-panel");
 const appPanel = document.getElementById("app");
 const listsEl = document.getElementById("lists");
@@ -88,7 +87,6 @@ function setGlobalAuthUi(isSignedIn, displayName = "") {
   if (whoamiEl) whoamiEl.textContent = isSignedIn && displayName ? `Signed in as ${displayName}` : "";
   if (logoutBtn) logoutBtn.classList.toggle("hidden", !isSignedIn);
   if (signinTopLink) signinTopLink.classList.toggle("hidden", isSignedIn);
-  if (signupTopLink) signupTopLink.classList.toggle("hidden", isSignedIn);
 
   if (signedOutPanel) signedOutPanel.classList.toggle("hidden", isSignedIn);
   if (appPanel) appPanel.classList.toggle("hidden", !isSignedIn);

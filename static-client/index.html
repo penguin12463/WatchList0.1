@@ -30,12 +30,6 @@
       <div class="nav-scrollable">
         <nav class="nav">
           <div id="lists"></div>
-          <div class="nav-item">
-            <form id="new-list-form" class="new-list-form">
-              <input id="new-list-name" type="text" placeholder="New List" maxlength="50" />
-              <button type="submit" class="new-list-btn"><span class="bi bi-plus-square-fill"></span>New List</button>
-            </form>
-          </div>
         </nav>
 
         <div class="nav-footer">
@@ -61,13 +55,11 @@
       </div>
 
       <article class="content" id="content-surface">
-        <section id="signed-out-panel" class="auth-wrap card hidden">
+        <section id="signed-out-panel" class="hidden">
           <div class="signed-out-box">
-            <img src="./images/person.png" alt="User" class="signed-out-user-icon" />
+            <img src="./images/person.png" loading="lazy" style="width:100px;height:100px;margin-bottom:10px;margin-top:40px;" />
             <h1>Please sign in!</h1>
-            <div class="inline" style="justify-content:center; margin-top:20px;">
-              <a class="auth-link-btn" href="https://accounts.watchlyst.co.uk/sign-in?redirect_url=https://watchlyst.co.uk/">Sign In</a>
-            </div>
+            <a class="btn btn-primary" href="https://accounts.watchlyst.co.uk/sign-in?redirect_url=https://watchlyst.co.uk/" style="margin-top:20px;color:white;">Sign In</a>
           </div>
         </section>
 
@@ -82,15 +74,13 @@
           <!-- List content — shown when a list is selected -->
           <div id="list-content" class="hidden">
 
-            <!-- Title row: gear icon | list name | (empty) -->
-            <div id="title-row" class="title-row">
-              <span class="title-row-left">
-                <a id="settings-link" href="./settings.html" class="title-settings-btn" title="List settings" style="justify-self:start;">
-                  <span class="bi bi-gear-fill" style="vertical-align:top;scale:1.5;"></span>
-                </a>
-              </span>
-              <h3 id="current-list-title" class="title-row-center"></h3>
-              <span class="title-row-right"></span>
+            <!-- Title row: gear icon | list name | (empty) — matches original Home.razor -->
+            <div id="title-row" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;width:100%;">
+              <a id="settings-link" href="./settings.html" style="justify-self:start;">
+                <span class="bi bi-gear-fill" style="vertical-align:top;scale:1.5;"></span>
+              </a>
+              <h3 id="current-list-title" style="margin:0;text-align:center;"></h3>
+              <span></span>
             </div>
 
             <div style="margin-top:20px;display:flex;flex-direction:column;align-items:center;width:100%;gap:10px;">

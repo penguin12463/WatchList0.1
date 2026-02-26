@@ -25,6 +25,7 @@
 ════════════════════════ */
 
 /* Matches original: flex row, gap 5px, padding 5px 10px, no margin */
+/* Transparent border becomes visible on hover (matches original app.css) */
 .movie-item {
   display: flex;
   flex-direction: row;
@@ -32,11 +33,17 @@
   gap: 5px;
   padding: 5px 10px;
   margin: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .movie-item:first-child {
   border-top: none;
+}
+
+.movie-item:hover {
+  border: 2px solid currentColor;
 }
 
 /* Bullet dot — scale:0.5 keeps it small */
@@ -67,7 +74,7 @@
   font-size: 0.95em;
 }
 
-/* Edit button — link style, pen icon in blue with black outline */
+/* Edit button — hidden until item is hovered (matches original app.css) */
 .movie-item-edit-btn {
   margin-left: auto;
   background: transparent !important;
@@ -77,6 +84,14 @@
   display: inline-flex;
   align-items: center;
   line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease-in-out;
+}
+
+.movie-item:hover .movie-item-edit-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .movie-item-edit-btn .bi-pen-fill {

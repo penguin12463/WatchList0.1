@@ -5,6 +5,9 @@
 /* ── Utility ── */
 .hidden { display: none !important; }
 
+/* ── Global link colour (matches original app.css) ── */
+a { color: #006bb7; }
+
 /* ════════════════════════
    Bootstrap-compatible UI
 ════════════════════════ */
@@ -31,13 +34,13 @@
 
 .btn-primary {
   color: #fff;
-  background-color: #0d6efd;
-  border-color: #0d6efd;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
 }
 
 .btn-primary:hover {
-  background-color: #0b5ed7;
-  border-color: #0a58ca;
+  background-color: #1761aa;
+  border-color: #1558a0;
 }
 
 .btn-outline-secondary {

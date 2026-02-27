@@ -353,5 +353,12 @@ a { color: #006bb7; }
 @media (max-width: 640px) {
   .settings-grid { grid-template-columns: auto 1fr auto; }
   .settings-center { width: 100%; }
-  .settings-rename-form { width: 80%; }
+  .settings-rename-form { width: 90%; }
+}
+
+@media (max-width: 900px) {
+  /* Title row: shrink heading on mobile */
+  #current-list-title {
+    font-size: 1.25rem !important;
+  }
 }

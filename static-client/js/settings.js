@@ -28,6 +28,17 @@ function initSpotlightToggle() {
   contentSurface?.classList.remove("spotlight-off");
 }
 
+// ── Mobile nav toggle ─────────────────────────────
+function initMobileNav() {
+  const btn = document.getElementById("mobile-menu-btn");
+  const navScrollable = document.querySelector(".nav-scrollable");
+  btn?.addEventListener("click", () => {
+    const isOpen = navScrollable?.classList.toggle("mobile-open");
+    btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    btn.querySelector(".bi").className = `bi ${isOpen ? "bi-x-lg" : "bi-list"}`;
+  });
+}
+
 // ── Nav (sidebar list) for settings page ─────────────
 async function renderNav() {
   if (!listsNavEl) return;
@@ -358,6 +369,7 @@ async function deleteOrLeave(id, isOwner, name) {
 // ── Entry point ───────────────────────────────────────
 async function main() {
   initSpotlightToggle();
+  initMobileNav();
 
   try {
     clerk = await initializeClerk();

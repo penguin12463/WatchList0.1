@@ -199,8 +199,31 @@
   border-bottom: 1px solid #f0f0f0;
 }
 
-.tmdb-result-item:last-child {
-  border-bottom: none;
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  /* Edit row wraps onto two lines on small screens */
+  .movie-item-edit-row {
+    flex-wrap: wrap;
+  }
+
+  .movie-item-edit-row .edit-title-input {
+    width: auto;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .movie-item-edit-row .edit-type-select,
+  .movie-item-edit-row .edit-num-input,
+  .movie-item-edit-row .edit-rating-select {
+    flex: 1 1 0;
+    min-width: 80px;
+    width: auto;
+  }
+
+  /* Tighter movie item padding */
+  .movie-item {
+    padding: 5px 6px;
+  }
 }
 
 .tmdb-result-item:hover {

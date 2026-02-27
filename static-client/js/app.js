@@ -42,7 +42,27 @@ setActiveListGetter(() => activeList);
 function initSpotlightToggle() {
   contentSurface?.classList.remove("spotlight-off");
 }
+// ── Mobile nav toggle ─────────────────────────────
+function initMobileNav() {
+  const btn = document.getElementById("mobile-menu-btn");
+  const navScrollable = document.querySelector(".nav-scrollable");
+  btn?.addEventListener("click", () => {
+    const isOpen = navScrollable?.classList.toggle("mobile-open");
+    btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    btn.querySelector(".bi").className = `bi ${isOpen ? "bi-x-lg" : "bi-list"}`;
+  });
+}
 
+export function closeMobileNav() {
+  const btn = document.getElementById("mobile-menu-btn");
+  const navScrollable = document.querySelector(".nav-scrollable");
+  navScrollable?.classList.remove("mobile-open");
+  if (btn) {
+    btn.setAttribute("aria-expanded", "false");
+    const icon = btn.querySelector(".bi");
+    if (icon) icon.className = "bi bi-list";
+  }
+}
 // ── Nav rendering ─────────────────────────────────────
 /**
  * Renders the list nav.
@@ -151,6 +171,7 @@ function showWelcomeScreen(hasList) {
 // ── List selection ────────────────────────────────────
 async function selectList(list) {
   activeList = list;
+  closeMobileNav();  // close nav drawer on mobile when a list is picked
   renderLists();
   configureListControls();
   if (!list) return;
@@ -290,6 +311,7 @@ async function initAppPage() {  // Remove initial loading placeholder as soon as
 // ── Entry point ───────────────────────────────────────
 async function main() {
   initSpotlightToggle();
+  initMobileNav();
 
   try {
     clerk = await initializeClerk();

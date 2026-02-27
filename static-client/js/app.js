@@ -185,8 +185,8 @@ async function loadLists(preferredListId = null) {
   }
 
   const picked =
-    (preferredListId && lists.find(l => l.id === preferredListId)) ||
-    (activeList && lists.find(l => l.id === activeList.id)) ||
+    (preferredListId && lists.find(l => l.id == preferredListId)) ||
+    (activeList && lists.find(l => l.id == activeList.id)) ||
     non_invited[0];
 
   if (picked?.access_type !== "invited") {
@@ -206,7 +206,8 @@ async function forceSignedOutState() {
 }
 
 // ── Main app page init ────────────────────────────────
-async function initAppPage() {
+async function initAppPage() {  // Remove initial loading placeholder as soon as we know auth state
+  document.getElementById("app-loading")?.remove();
   if (!clerk.user) {
     setGlobalAuthUi(false);
     return;

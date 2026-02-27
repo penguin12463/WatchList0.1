@@ -18,6 +18,14 @@ export function setActiveListGetter(fn) {
 export function buildMovieItem(movie) {
   const wrapper = document.createElement("div");
   wrapper.className = "movie-item";
+  wrapper.draggable = true;
+  wrapper.dataset.movieId = String(movie.id);
+
+  // ── Drag handle (always visible in view mode) ──
+  const dragHandle = document.createElement("span");
+  dragHandle.className = "bi bi-grip-vertical drag-handle";
+  dragHandle.title = "Drag to reorder";
+  wrapper.appendChild(dragHandle);
 
   // ── Dot (always visible) ──
   const dot = document.createElement("span");
@@ -183,12 +191,15 @@ export function buildMovieItem(movie) {
 
   // ── Show / hide helpers ──
   const showView = () => {
+    dragHandle.style.display = "";
     viewNodes.forEach(n => { n.style.display = ""; });
     editDiv.classList.add("hidden");
     editDiv.style.display = "none";
+    wrapper.draggable = true;
   };
 
   const showEdit = () => {
+    dragHandle.style.display = "none";
     // Reset inputs to current (potentially just-updated) movie values
     titleInput.value = movie.title;
     typeSelect.value = movie.media_type || "";
@@ -204,6 +215,7 @@ export function buildMovieItem(movie) {
         ? (movie.number_of_episodes ?? "")
         : (movie.runtime ?? "");
     }
+    wrapper.draggable = false;
     viewNodes.forEach(n => { n.style.display = "none"; });
     editDiv.classList.remove("hidden");
     editDiv.style.display = "flex";
@@ -256,7 +268,7 @@ export function buildMovieItem(movie) {
 
 // ──────────────────────────────────────────────────────
 
-export function renderMovies(movies = [], moviesEl) {
+export function renderMovies(movies = [], moviesEl, listId) {
   if (!moviesEl) return;
   moviesEl.innerHTML = "";
 
@@ -270,6 +282,7 @@ export function renderMovies(movies = [], moviesEl) {
   const container = document.createElement("div");
   container.className = "movie-list-container";
   movies.forEach(m => container.appendChild(buildMovieItem(m)));
+  if (listId) initDragAndDrop(container, listId);
   moviesEl.appendChild(container);
 }
 
@@ -281,5 +294,74 @@ export async function loadMovies(listId, moviesEl) {
     moviesEl.appendChild(loading);
   }
   const rows = await apiFetch(`/api/lists/${listId}/movies`);
-  renderMovies(Array.isArray(rows) ? rows : [], moviesEl);
+  renderMovies(Array.isArray(rows) ? rows : [], moviesEl, listId);
+}
+
+// ── Drag-and-drop reordering ────────────────────────────────
+function initDragAndDrop(container, listId) {
+  let dragSrc = null;
+
+  container.addEventListener("dragstart", (e) => {
+    const item = e.target.closest(".movie-item");
+    if (!item) return;
+    dragSrc = item;
+    // Delay class addition so the ghost image captures the normal style
+    requestAnimationFrame(() => item.classList.add("dragging"));
+    e.dataTransfer.effectAllowed = "move";
+  });
+
+  container.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const item = e.target.closest(".movie-item");
+    if (!item || item === dragSrc) return;
+    // Show insertion line above or below
+    const mid = item.getBoundingClientRect().top + item.getBoundingClientRect().height / 2;
+    container.querySelectorAll(".movie-item").forEach(el =>
+      el.classList.remove("drag-over-top", "drag-over-bottom")
+    );
+    item.classList.add(e.clientY < mid ? "drag-over-top" : "drag-over-bottom");
+  });
+
+  container.addEventListener("dragleave", (e) => {
+    if (!container.contains(e.relatedTarget)) {
+      container.querySelectorAll(".movie-item").forEach(el =>
+        el.classList.remove("drag-over-top", "drag-over-bottom")
+      );
+    }
+  });
+
+  container.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const target = e.target.closest(".movie-item");
+    container.querySelectorAll(".movie-item").forEach(el =>
+      el.classList.remove("drag-over-top", "drag-over-bottom", "dragging")
+    );
+    if (!target || !dragSrc || target === dragSrc) { dragSrc = null; return; }
+
+    const mid = target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+    if (e.clientY < mid) {
+      container.insertBefore(dragSrc, target);
+    } else {
+      target.after(dragSrc);
+    }
+    dragSrc = null;
+
+    const ids = [...container.querySelectorAll(".movie-item")].map(el => Number(el.dataset.movieId));
+    try {
+      await apiFetch(`/api/lists/${listId}/movies/reorder`, {
+        method: "PATCH",
+        body: { ids },
+      });
+    } catch (err) {
+      showStatus(getErrorMessage(err, "Unable to save order"), true);
+    }
+  });
+
+  container.addEventListener("dragend", () => {
+    container.querySelectorAll(".movie-item").forEach(el =>
+      el.classList.remove("dragging", "drag-over-top", "drag-over-bottom")
+    );
+    dragSrc = null;
+  });
 }

@@ -170,7 +170,7 @@ app.get("/api/lists/:id/movies", async (c) => {
     join public.movies m on m.id = wm.movie_id
     where wm.watchlist_id = ${listId}
       and public.is_watchlist_accessible(${listId}, ${userId})
-    order by wm.created_at asc
+    order by wm.position asc, wm.created_at asc
   `;
 
   return c.json(rows);
@@ -232,6 +232,21 @@ app.post("/api/lists/:id/movies", async (c) => {
     ) as movie_id
   `;
 
+  const newMovieId = rows[0]?.movie_id;
+  if (newMovieId) {
+    // Place new movie at the end of the list
+    await sql`
+      UPDATE public.watchlist_movies
+      SET position = (
+        SELECT COALESCE(MAX(position), -1) + 1
+        FROM public.watchlist_movies
+        WHERE watchlist_id = ${listId}
+      )
+      WHERE watchlist_id = ${listId}
+        AND movie_id = ${newMovieId}
+    `;
+  }
+
   return c.json(rows[0], 201);
 });
 
@@ -276,6 +291,43 @@ app.patch("/api/movies/:id", async (c) => {
   }
 
   return c.json(rows[0]);
+});
+
+app.patch("/api/lists/:id/movies/reorder", async (c) => {
+  const userId = c.get("userId");
+  const listId = Number(c.req.param("id"));
+  const body = await c.req.json<{ ids: number[] }>();
+  const ids = body.ids;
+
+  if (!Array.isArray(ids) || !ids.length) {
+    return c.json({ error: "ids array required" }, 400);
+  }
+
+  const sql = db(c.env);
+
+  // Verify access (owner or shared — not invited)
+  const access = await sql`
+    SELECT access_type FROM public.v_user_watchlists
+    WHERE id = ${listId} AND user_id = ${userId}
+  `;
+  if (!access.length || access[0].access_type === "invited") {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+
+  // Update every movie's position in one statement via unnest
+  await sql`
+    UPDATE public.watchlist_movies AS wm
+    SET position = vals.pos
+    FROM (
+      SELECT
+        unnest(${ids}::int[]) AS movie_id,
+        generate_series(0, ${ids.length - 1}) AS pos
+    ) AS vals
+    WHERE wm.watchlist_id = ${listId}
+      AND wm.movie_id = vals.movie_id
+  `;
+
+  return c.body(null, 204);
 });
 
 app.delete("/api/lists/:listId/movies/:movieId", async (c) => {

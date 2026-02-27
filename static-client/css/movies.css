@@ -46,7 +46,39 @@
   border: 2px solid currentColor;
 }
 
-/* Bullet dot — scale:0.5 keeps it small */
+/* ── Drag handle ── */
+.drag-handle {
+  flex-shrink: 0;
+  cursor: grab;
+  color: #aaa;
+  font-size: 1rem;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+}
+
+.movie-item:hover .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* ── Drag state ── */
+.movie-item.dragging {
+  opacity: 0.4;
+}
+
+.movie-item.drag-over-top {
+  border-top: 2px solid #1b6ec2 !important;
+}
+
+.movie-item.drag-over-bottom {
+  border-bottom: 2px solid #1b6ec2 !important;
+}
+
+/* ── Bullet dot ── */
 .movie-dot {
   flex-shrink: 0;
   font-size: 0.5rem; /* scale:0.5 equivalent */

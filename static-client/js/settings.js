@@ -13,7 +13,7 @@ import {
 } from "./api.js";
 
 // ── DOM refs ──────────────────────────────────────────
-const spotlightToggle  = document.getElementById("spotlight-toggle");
+
 const contentSurface   = document.getElementById("content-surface");
 const logoutBtn        = document.getElementById("logout-btn");
 const listsNavEl       = document.getElementById("lists");
@@ -23,18 +23,9 @@ const settingsContent  = document.getElementById("settings-content");
 let clerk   = null;
 const listId = parseInt(new URLSearchParams(window.location.search).get("listId") ?? "0", 10) || null;
 
-// ── Spotlight ─────────────────────────────────────────
+// ── Spotlight (always on) ───────────────────────────
 function initSpotlightToggle() {
-  if (!spotlightToggle) return;
-  const saved = localStorage.getItem("watchlyst.spotlight");
-  const enabled = saved !== "off";
-  spotlightToggle.checked = enabled;
-  contentSurface?.classList.toggle("spotlight-off", !enabled);
-  spotlightToggle.addEventListener("change", () => {
-    const on = spotlightToggle.checked;
-    localStorage.setItem("watchlyst.spotlight", on ? "on" : "off");
-    contentSurface?.classList.toggle("spotlight-off", !on);
-  });
+  contentSurface?.classList.remove("spotlight-off");
 }
 
 // ── Nav (sidebar list) for settings page ─────────────
@@ -311,6 +302,7 @@ async function renderSettings() {
   }
 
   grid.append(backCol, centerCol, rightCol);
+  settingsContent.innerHTML = "";
   settingsContent.appendChild(grid);
 }
 

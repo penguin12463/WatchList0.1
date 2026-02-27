@@ -13,7 +13,7 @@ import { setActiveListGetter, loadMovies, renderMovies } from "./movies.js";
 import { initTmdbSearch, hideTmdbResults } from "./tmdb.js";
 
 // ── DOM refs ──────────────────────────────────────────
-const spotlightToggle   = document.getElementById("spotlight-toggle");
+
 const contentSurface    = document.getElementById("content-surface");
 const logoutBtn         = document.getElementById("logout-btn");
 const listsEl           = document.getElementById("lists");
@@ -38,22 +38,9 @@ let tmdbSelected    = null;
 
 setActiveListGetter(() => activeList);
 
-// ── Spotlight ─────────────────────────────────────────
-function applySpotlight(enabled) {
-  contentSurface?.classList.toggle("spotlight-off", !enabled);
-}
-
+// ── Spotlight (always on) ────────────────────────────
 function initSpotlightToggle() {
-  if (!spotlightToggle) return;
-  const saved = localStorage.getItem("watchlyst.spotlight");
-  const enabled = saved !== "off";
-  spotlightToggle.checked = enabled;
-  applySpotlight(enabled);
-  spotlightToggle.addEventListener("change", () => {
-    const on = spotlightToggle.checked;
-    localStorage.setItem("watchlyst.spotlight", on ? "on" : "off");
-    applySpotlight(on);
-  });
+  contentSurface?.classList.remove("spotlight-off");
 }
 
 // ── Nav rendering ─────────────────────────────────────
@@ -107,47 +94,27 @@ function renderLists() {
     listsEl.appendChild(item);
   }
 
-  // "New List" nav item (inline form, collapsed until input focused)
+  // "New List" nav item — creates immediately and navigates to settings for naming
   const newItem = document.createElement("div");
   newItem.className = "nav-item";
-  newItem.innerHTML = `
-    <form id="new-list-form" class="new-list-form" title="Create a new list">
-      <button type="submit" class="nav-link new-list-nav-link" style="font-style:normal;">
-        <span class="bi bi-plus-square-fill" style="vertical-align:middle;"></span>
-        New List
-      </button>
-      <input id="new-list-name" type="text" placeholder="List name" maxlength="50" class="hidden" />
-    </form>
-  `;
-  listsEl.appendChild(newItem);
-
-  // Wire the new-list button/input
-  const form      = document.getElementById("new-list-form");
-  const nameInput = document.getElementById("new-list-name");
-  const submitBtn = newItem.querySelector("button");
-
-  submitBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    nameInput?.classList.remove("hidden");
-    nameInput?.focus();
-  });
-
-  form?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const name = (nameInput?.value || "").trim() || "New List";
+  const newLink = document.createElement("button");
+  newLink.type = "button";
+  newLink.className = "nav-link";
+  newLink.style.fontStyle = "normal";
+  newLink.innerHTML = `<span class="bi bi-plus-square-fill" style="vertical-align:middle;"></span> New List`;
+  newLink.addEventListener("click", async () => {
     try {
       const created = await apiFetch("/api/lists", {
         method: "POST",
-        body: { name },
+        body: { name: "New List" },
       });
-      if (nameInput) nameInput.value = "";
-      nameInput?.classList.add("hidden");
-      await loadLists(created?.id || null);
-      showStatus("List created.");
+      window.location.href = `./settings.html?listId=${created.id}`;
     } catch (err) {
       showStatus(getErrorMessage(err, "Unable to create list"), true);
     }
   });
+  newItem.appendChild(newLink);
+  listsEl.appendChild(newItem);
 }
 
 // ── List controls ─────────────────────────────────────

@@ -344,6 +344,11 @@ main {
     width: 120px;
   }
 
+  /* Scale TMDB logo way down in the mobile nav */
+  .tmdb-logo {
+    width: 40px;
+  }
+
   /* Nav slides open/closed */
   .nav-scrollable {
     height: auto;

@@ -351,9 +351,44 @@ a { color: #006bb7; }
 }
 
 @media (max-width: 640px) {
-  .settings-grid { grid-template-columns: auto 1fr auto; }
-  .settings-center { width: 100%; }
-  .settings-rename-form { width: 90%; }
+  /* Back button (top-left) + trash (top-right), center content full-width on next row */
+  .settings-grid {
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto auto;
+  }
+  .settings-start {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .settings-end {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .settings-center {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    align-self: start;
+  }
+
+  /* Rename form full-width, input a bit smaller */
+  .settings-rename-form {
+    width: 100%;
+  }
+
+  .settings-rename-input.form-control {
+    font-size: 1.25rem;
+  }
+
+  /* Invite row stacks on narrow screens */
+  .share-invite-row {
+    flex-direction: column;
+  }
+
+  /* User rows wrap so remove button doesn't get cut off */
+  .share-user-row {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 900px) {

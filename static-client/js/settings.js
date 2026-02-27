@@ -124,8 +124,12 @@ async function renderSettings() {
   backCol.style.justifySelf = "start";
   const backLink = document.createElement("a");
   backLink.href = isInvited ? "./index.html" : backHref;
-  backLink.className = "btn btn-primary";
-  backLink.innerHTML = `<span class="bi bi-arrow-left" style="vertical-align:top;"></span> Back`;
+  backLink.className = "nav-link";
+  const backBtn = document.createElement("button");
+  backBtn.type = "button";
+  backBtn.className = "btn btn-primary";
+  backBtn.innerHTML = `<span class="bi bi-arrow-left" style="vertical-align:top;"></span> Back`;
+  backLink.appendChild(backBtn);
   backCol.appendChild(backLink);
 
   // ── Center column ──
@@ -140,10 +144,13 @@ async function renderSettings() {
     const trashBtn = document.createElement("button");
     trashBtn.type = "button";
     trashBtn.title = isOwner ? "Delete list" : "Leave shared list";
-    trashBtn.style.cssText = "background:none;border:none;cursor:pointer;margin-top:10px;padding:0;";
-    trashBtn.innerHTML = `<span class="bi bi-trash-fill" style="font-size:1.5rem;color:red;"></span>`;
+    trashBtn.style.cssText = "background:none;border:none;cursor:pointer;padding:0;";
+    trashBtn.innerHTML = `<span class="bi bi-trash-fill" style="scale:1.5;color:red;margin-top:10px;display:inline-block;"></span>`;
     trashBtn.addEventListener("click", () => deleteOrLeave(listId, isOwner, name));
     rightCol.appendChild(trashBtn);
+  } else {
+    // Empty span so grid columns stay balanced (matches original)
+    rightCol.appendChild(document.createElement("span"));
   }
 
   // ── Centre content depending on role ──
@@ -158,9 +165,9 @@ async function renderSettings() {
     nameInput.type = "text";
     nameInput.className = "form-control";
     nameInput.value = currentName;
-    nameInput.maxLength = 50;
+    nameInput.maxLength = 10;
     nameInput.required = true;
-    nameInput.style.cssText = "font-size:1.75rem;font-weight:500;text-align:center;padding:0;width:100%;";
+    nameInput.style.cssText = "font-size:1.75rem;font-weight:500;text-align:center;padding-top:0;padding-bottom:0;padding-left:0;padding-right:0;width:100%;";
 
     const saveNameBtn = document.createElement("button");
     saveNameBtn.type = "submit";
@@ -175,8 +182,6 @@ async function renderSettings() {
       if (!newName) return;
       try {
         await apiFetch(`/api/lists/${listId}`, { method: "PATCH", body: { name: newName } });
-        currentName = newName;
-        showStatus("List renamed.");
         window.location.href = backHref;
       } catch (err) {
         showStatus(getErrorMessage(err, "Unable to rename"), true);
@@ -225,10 +230,10 @@ async function renderSettings() {
           body: { username },
         });
         usernameInput.value = "";
-        shareMsg.innerHTML = `<div class="alert alert-success">Invitation sent to ${username}.</div>`;
+        shareMsg.innerHTML = `<div class="alert alert-success" style="margin-top:10px;margin-bottom:0;">Invite sent to ${username}.</div>`;
         await refreshSharedUsers(sharedUsersList);
       } catch (err) {
-        shareMsg.innerHTML = `<div class="alert alert-danger">${getErrorMessage(err, "Unable to invite user")}</div>`;
+        shareMsg.innerHTML = `<div class="alert alert-danger" style="margin-top:10px;margin-bottom:0;">${getErrorMessage(err, "Unable to invite user")}</div>`;
       }
     });
 

@@ -218,6 +218,42 @@ app.post("/api/lists/:id/movies", async (c) => {
     return c.json({ error: "Title is required" }, 400);
   }
 
+  // If no tmdb_id was provided (user typed title manually without picking from autocomplete),
+  // auto-search TMDB and use the top result so we always have a unique ID to deduplicate on.
+  if (!body.tmdb_id && c.env.TMDB_API_KEY) {
+    try {
+      const searchUrl = `${TMDB_BASE}/search/multi?api_key=${c.env.TMDB_API_KEY}&query=${encodeURIComponent(title)}&include_adult=false&page=1`;
+      const searchResp = await fetch(searchUrl);
+      if (searchResp.ok) {
+        const searchData: any = await searchResp.json();
+        const topResult = (searchData.results || []).find(
+          (r: any) => r.media_type === "movie" || r.media_type === "tv"
+        );
+        if (topResult) {
+          body.media_type = topResult.media_type;
+          body.tmdb_id = topResult.id;
+          const detailUrl = topResult.media_type === "movie"
+            ? `${TMDB_BASE}/movie/${topResult.id}?api_key=${c.env.TMDB_API_KEY}`
+            : `${TMDB_BASE}/tv/${topResult.id}?api_key=${c.env.TMDB_API_KEY}`;
+          const detailResp = await fetch(detailUrl);
+          if (detailResp.ok) {
+            const detail: any = await detailResp.json();
+            if (topResult.media_type === "movie") {
+              body.runtime = detail.runtime || null;
+            } else {
+              body.number_of_episodes = detail.number_of_episodes || null;
+              body.runtime = Array.isArray(detail.episode_run_time) && detail.episode_run_time.length
+                ? detail.episode_run_time[0]
+                : null;
+            }
+          }
+        }
+      }
+    } catch {
+      // If TMDB lookup fails, continue with just the title — better than refusing to add
+    }
+  }
+
   const sql = db(c.env);
 
   const rows = await sql`

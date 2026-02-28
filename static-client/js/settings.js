@@ -147,7 +147,7 @@ async function renderSettings() {
     trashBtn.type = "button";
     trashBtn.title = isOwner ? "Delete list" : "Leave shared list";
     trashBtn.style.cssText = "background:none;border:none;cursor:pointer;padding:0;";
-    trashBtn.innerHTML = `<span class="bi bi-trash-fill" style="scale:1.5;color:red;margin-top:10px;display:inline-block;"></span>`;
+    trashBtn.innerHTML = `<span class="bi bi-trash-fill" style="color:red;display:inline-block;"></span>`;
     trashBtn.addEventListener("click", () => deleteOrLeave(listId, isOwner, name));
     rightCol.appendChild(trashBtn);
   } else {

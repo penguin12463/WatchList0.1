@@ -53,16 +53,17 @@ async function _doSearch(query) {
         ? `/api/tmdb/tv/${r.id}`
         : `/api/tmdb/movie/${r.id}`;
       apiFetch(endpoint).then(detail => {
-        const runtime = r.media_type === "movie"
-          ? (detail?.runtime ?? null)
-          : (detail?.episode_run_time?.[0] ?? null);
         const span = metaSpans[i];
-        if (span && runtime) {
-          const parts = [];
-          if (r.year) parts.push(r.year);
-          parts.push(`${runtime} min`);
-          span.textContent = parts.join(" · ");
+        if (!span) return;
+        const parts = [];
+        if (r.year) parts.push(r.year);
+        if (r.media_type === "tv") {
+          if (detail?.number_of_episodes) parts.push(`${detail.number_of_episodes} ep`);
+          if (detail?.episode_run_time) parts.push(`${detail.episode_run_time} min`);
+        } else {
+          if (detail?.runtime) parts.push(`${detail.runtime} min`);
         }
+        if (parts.length) span.textContent = parts.join(" · ");
       }).catch(() => {});
     });
   } catch {

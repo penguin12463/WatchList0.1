@@ -463,6 +463,7 @@ app.get("/api/tmdb/tv/:id", async (c) => {
     id: data.id,
     name: data.name,
     number_of_episodes: data.number_of_episodes || null,
+    episode_run_time: Array.isArray(data.episode_run_time) && data.episode_run_time.length ? data.episode_run_time[0] : null,
     first_air_date: (data.first_air_date || "").slice(0, 4),
   });
 });

@@ -270,7 +270,6 @@ async function initAppPage() {  // Remove initial loading placeholder as soon as
       tmdbSelected = null;
       hideTmdbResults();
       await loadMovies(activeList.id, moviesEl);
-      showStatus("Title added.");
     } catch (err) {
       showStatus(getErrorMessage(err, "Unable to add title"), true);
     }

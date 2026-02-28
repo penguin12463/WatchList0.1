@@ -23,3 +23,4 @@ supabase/
 neon-worker/node_modules/
 neon-worker/.wrangler/
 neon-worker/.dev.vars
+node_modules/

@@ -327,18 +327,6 @@ main {
   background: transparent;
 }
 
-/* ── Settings page: same scrollable treatment ── */
-[data-page="settings"] main {
-  overflow-y: auto;
-  height: 100vh;
-}
-
-[data-page="settings"] .content {
-  overflow-y: visible;
-  min-height: unset;
-  padding-bottom: 80px;
-}
-
 /* ── Responsive / mobile ── */
 @media (max-width: 900px) {
   /* Allow the page to scroll vertically */

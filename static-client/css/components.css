@@ -455,6 +455,12 @@ a { color: #006bb7; }
   .share-user-row {
     flex-wrap: wrap;
   }
+
+  /* Bigger trash/leave icon on mobile */
+  .settings-end .bi-trash-fill {
+    scale: 2 !important;
+    margin-top: 14px !important;
+  }
 }
 
 @media (max-width: 900px) {

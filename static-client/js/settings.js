@@ -118,12 +118,12 @@ async function renderSettings() {
   const backHref  = `./index.html?listId=${listId}`;
 
   // Outer 3-column grid: back | center | action (trash)
-  const grid = document.createElement("span");
-  grid.style.cssText = "display:grid;grid-template-columns:1fr auto 1fr;align-items:start;width:100%;";
+  const grid = document.createElement("div");
+  grid.className = "settings-grid";
 
   // ── Back button (top-left) ──
   const backCol = document.createElement("span");
-  backCol.style.justifySelf = "start";
+  backCol.className = "settings-start";
   const backLink = document.createElement("a");
   backLink.href = isInvited ? "./index.html" : backHref;
   backLink.className = "nav-link";
@@ -136,11 +136,11 @@ async function renderSettings() {
 
   // ── Center column ──
   const centerCol = document.createElement("div");
-  centerCol.style.cssText = "margin:0;display:flex;flex-direction:column;align-items:center;width:600px;max-width:100%;";
+  centerCol.className = "settings-center";
 
   // ── Right column (trash / leave) ──
   const rightCol = document.createElement("span");
-  rightCol.style.justifySelf = "end";
+  rightCol.className = "settings-end";
 
   if (isOwner || isShared) {
     const trashBtn = document.createElement("button");
@@ -161,15 +161,14 @@ async function renderSettings() {
     // ─ Rename form ─
     let currentName = name;
     const renameForm = document.createElement("form");
-    renameForm.style.cssText = "margin:0;display:flex;flex-direction:row;align-items:center;width:50%;gap:10px;";
+    renameForm.className = "settings-rename-form";
 
     const nameInput = document.createElement("input");
     nameInput.type = "text";
-    nameInput.className = "form-control";
+    nameInput.className = "form-control settings-rename-input";
     nameInput.value = currentName;
     nameInput.maxLength = 10;
     nameInput.required = true;
-    nameInput.style.cssText = "font-size:1.75rem;font-weight:500;text-align:center;padding-top:0;padding-bottom:0;padding-left:0;padding-right:0;width:100%;";
 
     const saveNameBtn = document.createElement("button");
     saveNameBtn.type = "submit";
@@ -194,14 +193,14 @@ async function renderSettings() {
 
     // ─ Share box ─
     const shareBox = document.createElement("div");
-    shareBox.style.cssText = "margin-top:20px;width:100%;border:1px solid currentColor;border-radius:5px;padding:12px;box-sizing:border-box;";
+    shareBox.className = "share-box";
 
     const shareHeading = document.createElement("h5");
     shareHeading.style.margin = "0 0 10px 0";
     shareHeading.textContent = "Share Watchlist";
 
     const inviteRow = document.createElement("form");
-    inviteRow.style.cssText = "display:flex;gap:8px;";
+    inviteRow.className = "share-invite-row";
 
     const usernameInput = document.createElement("input");
     usernameInput.type = "text";
@@ -240,7 +239,7 @@ async function renderSettings() {
     });
 
     const sharedUsersList = document.createElement("div");
-    sharedUsersList.style.cssText = "margin-top:10px;display:flex;flex-direction:column;gap:8px;";
+    sharedUsersList.className = "share-users-list";
 
     shareBox.append(shareHeading, inviteRow, shareMsg, sharedUsersList);
     centerCol.appendChild(shareBox);
@@ -261,7 +260,7 @@ async function renderSettings() {
       : "This watchlist has been shared with you.";
 
     const actionsDiv = document.createElement("div");
-    actionsDiv.style.cssText = "display:flex;gap:10px;margin-top:10px;";
+    actionsDiv.className = "settings-actions";
 
     const acceptBtn = document.createElement("button");
     acceptBtn.type = "button";
@@ -329,7 +328,7 @@ async function refreshSharedUsers(container) {
     }
     for (const u of users) {
       const row = document.createElement("div");
-      row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;";
+      row.className = "share-user-row";
       const label = document.createElement("span");
       label.textContent = u.username || u.user_id;
       const removeBtn = document.createElement("button");
@@ -400,7 +399,6 @@ async function main() {
     });
   } catch (err) {
     console.error("[settings] init failed:", err);
-    showStatus(getErrorMessage(err, "Failed to initialize settings"), true);
   }
 }
 

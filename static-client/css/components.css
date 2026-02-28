@@ -5,6 +5,11 @@
 /* ── Utility ── */
 .hidden { display: none !important; }
 
+/* ── Content area: links and text match Blazor original (black on white/spotlight bg) ── */
+.content a {
+  color: #000;
+}
+
 /* ── Global link colour (matches original app.css) ── */
 a { color: #006bb7; }
 

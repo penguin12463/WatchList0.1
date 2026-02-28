@@ -300,11 +300,11 @@ async function initAppPage() {  // Remove initial loading placeholder as soon as
         await loadLists(null);
         return;
       } catch (retryErr) {
-        showStatus(getErrorMessage(retryErr, "Failed to load app data"), true);
+        console.error("[app] Failed to load app data after retry:", retryErr);
         return;
       }
     }
-    showStatus(getErrorMessage(err, "Failed to load app data"), true);
+    console.error("[app] Failed to load app data:", err);
   }
 }
 
@@ -331,7 +331,7 @@ async function main() {
   } catch (err) {
     const message = getErrorMessage(err, "App failed to initialize");
     showAuthError(message);
-    showStatus(message, true);
+    console.error("[app] init failed:", err);
   }
 }
 

@@ -346,7 +346,7 @@ main {
 
   /* Scale TMDB logo way down in the mobile nav */
   .tmdb-logo {
-    width: 40px;
+    width: 50px;
   }
 
   /* Nav slides open/closed */

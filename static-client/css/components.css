@@ -409,7 +409,7 @@ a { color: #006bb7; }
 
 .settings-delete-link .bi-trash-fill,
 .settings-end .bi-trash-fill {
-  font-size: 4rem;
+  font-size: 2rem;
   color: red;
 }
 

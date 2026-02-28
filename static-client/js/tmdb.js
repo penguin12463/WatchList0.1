@@ -44,7 +44,27 @@ async function _doSearch(query) {
   if (!query || query.length < 2) { _hide(); return; }
   try {
     const data = await apiFetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
-    _show(data?.results || []);
+    const results = data?.results || [];
+    const metaSpans = _show(results);
+
+    // Fetch detail for each result in parallel to get runtimes
+    results.forEach((r, i) => {
+      const endpoint = r.media_type === "tv"
+        ? `/api/tmdb/tv/${r.id}`
+        : `/api/tmdb/movie/${r.id}`;
+      apiFetch(endpoint).then(detail => {
+        const runtime = r.media_type === "movie"
+          ? (detail?.runtime ?? null)
+          : (detail?.episode_run_time?.[0] ?? null);
+        const span = metaSpans[i];
+        if (span && runtime) {
+          const parts = [];
+          if (r.year) parts.push(r.year);
+          parts.push(`${runtime} min`);
+          span.textContent = parts.join(" · ");
+        }
+      }).catch(() => {});
+    });
   } catch {
     _hide();
   }
@@ -54,7 +74,9 @@ function _show(results) {
   if (!_resultsEl) return;
   _resultsEl.innerHTML = "";
 
-  if (!results.length) { _resultsEl.classList.add("hidden"); return; }
+  if (!results.length) { _resultsEl.classList.add("hidden"); return []; }
+
+  const metaSpans = [];
 
   for (const r of results) {
     const item = document.createElement("div");
@@ -69,10 +91,8 @@ function _show(results) {
 
     const metaSpan = document.createElement("span");
     metaSpan.className = "tmdb-year";
-    const parts = [];
-    if (r.year) parts.push(r.year);
-    if (r.runtime) parts.push(`${r.runtime} min`);
-    metaSpan.textContent = parts.join(" · ");
+    metaSpan.textContent = r.year || "";
+    metaSpans.push(metaSpan);
 
     item.append(icon, titleSpan, metaSpan);
 
@@ -103,4 +123,5 @@ function _show(results) {
   }
 
   _resultsEl.classList.remove("hidden");
+  return metaSpans;
 }

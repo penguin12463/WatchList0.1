@@ -284,6 +284,15 @@ export function renderMovies(movies = [], moviesEl, listId) {
   movies.forEach(m => container.appendChild(buildMovieItem(m)));
   if (listId) initDragAndDrop(container, listId);
   moviesEl.appendChild(container);
+
+  // On touch devices, briefly highlight the first item so users know they can tap to edit
+  if (movies.length && 'ontouchstart' in window) {
+    const firstItem = container.querySelector('.movie-item');
+    if (firstItem) {
+      firstItem.classList.add('touch-active');
+      setTimeout(() => firstItem.classList.remove('touch-active'), 2000);
+    }
+  }
 }
 
 export async function loadMovies(listId, moviesEl) {
@@ -299,6 +308,7 @@ export async function loadMovies(listId, moviesEl) {
 
 // ── Drag-and-drop reordering ────────────────────────────────
 function initDragAndDrop(container, listId) {
+  initTouchDragAndDrop(container, listId);
   let dragSrc = null;
 
   container.addEventListener("dragstart", (e) => {
@@ -362,6 +372,70 @@ function initDragAndDrop(container, listId) {
     container.querySelectorAll(".movie-item").forEach(el =>
       el.classList.remove("dragging", "drag-over-top", "drag-over-bottom")
     );
+    dragSrc = null;
+  });
+}
+
+// ── Touch drag-and-drop reordering (mobile) ───────────────────
+function initTouchDragAndDrop(container, listId) {
+  let dragSrc = null;
+
+  container.addEventListener("touchstart", (e) => {
+    const handle = e.target.closest(".drag-handle");
+    if (!handle) return;
+    const item = handle.closest(".movie-item");
+    if (!item) return;
+    dragSrc = item;
+    item.classList.add("dragging");
+    e.preventDefault();
+  }, { passive: false });
+
+  container.addEventListener("touchmove", (e) => {
+    if (!dragSrc) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    // Temporarily hide the dragged item so elementFromPoint finds what's underneath
+    dragSrc.style.visibility = "hidden";
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    dragSrc.style.visibility = "";
+    const target = el?.closest(".movie-item");
+    container.querySelectorAll(".movie-item").forEach(i =>
+      i.classList.remove("drag-over-top", "drag-over-bottom")
+    );
+    if (target && target !== dragSrc) {
+      const mid = target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+      target.classList.add(touch.clientY < mid ? "drag-over-top" : "drag-over-bottom");
+    }
+  }, { passive: false });
+
+  container.addEventListener("touchend", async (e) => {
+    if (!dragSrc) return;
+    const touch = e.changedTouches[0];
+    dragSrc.style.visibility = "hidden";
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    dragSrc.style.visibility = "";
+    const target = el?.closest(".movie-item");
+    container.querySelectorAll(".movie-item").forEach(i =>
+      i.classList.remove("drag-over-top", "drag-over-bottom", "dragging")
+    );
+    if (target && target !== dragSrc) {
+      const rect = target.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (touch.clientY < mid) {
+        container.insertBefore(dragSrc, target);
+      } else {
+        target.after(dragSrc);
+      }
+      const ids = [...container.querySelectorAll(".movie-item")].map(el => Number(el.dataset.movieId));
+      try {
+        await apiFetch(`/api/lists/${listId}/movies/reorder`, {
+          method: "PATCH",
+          body: { ids },
+        });
+      } catch (err) {
+        showStatus(getErrorMessage(err, "Unable to save order"), true);
+      }
+    }
     dragSrc = null;
   });
 }

@@ -252,9 +252,26 @@
     width: auto;
   }
 
-  /* Tighter movie item padding */
+  /* Tighter movie item padding + min tap target */
   .movie-item {
     padding: 5px 6px;
+    min-height: 44px;
+  }
+
+  /* On touch devices, always show the drag handle and edit button */
+  .movie-item .drag-handle {
+    opacity: 1;
+    font-size: 1.3rem;
+  }
+
+  .movie-item .movie-item-edit-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* touch-active = mobile equivalent of hover (briefly shown on first item, applied on tap) */
+  .movie-item.touch-active {
+    border: 2px solid currentColor;
   }
 }
 

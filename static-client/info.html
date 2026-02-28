@@ -36,11 +36,7 @@
 
       <div class="nav-scrollable">
         <nav class="nav">
-          <div class="nav-item">
-            <a href="./" class="nav-link">
-              <span class="bi bi-house-fill" style="vertical-align:middle;"></span> Home
-            </a>
-          </div>
+          <div id="lists"></div>
         </nav>
 
         <div class="nav-footer">
@@ -52,7 +48,14 @@
     <!-- ── Main ── -->
     <main>
       <div class="top-row top-auth-row">
-        <div class="top-auth-content"></div>
+        <div class="top-auth-content">
+          <span id="whoami"></span>
+          <a id="signin-top-link" class="nav-link hidden"
+             href="https://accounts.watchlyst.co.uk/sign-in?redirect_url=https://watchlyst.co.uk/">
+            <strong>Sign In</strong>
+          </a>
+          <button id="logout-btn" type="button" class="hidden">Logout</button>
+        </div>
       </div>
 
       <article class="content" id="content-surface">
@@ -73,15 +76,6 @@
     </main>
   </div>
 
-  <script>
-    // Mobile nav toggle (no Clerk needed on this static page)
-    const btn = document.getElementById('mobile-menu-btn');
-    const nav = document.querySelector('.nav-scrollable');
-    btn?.addEventListener('click', () => {
-      const open = nav?.classList.toggle('mobile-open');
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      btn.querySelector('.bi').className = `bi ${open ? 'bi-x-lg' : 'bi-list'}`;
-    });
-  </script>
+  <script type="module" src="./js/info.js?v=20260302h"></script>
 </body>
 </html>

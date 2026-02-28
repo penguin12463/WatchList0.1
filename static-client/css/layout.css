@@ -381,10 +381,11 @@ main {
     overflow-y: auto;
   }
 
-  /* Tighter content padding */
+  /* Tighter content padding; white bg (spotlight is mouse-only) */
   .content {
     padding: 0.85rem 0.85rem 0;
     min-height: unset;
+    background: #fff;
   }
 
   .top-auth-row {

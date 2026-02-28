@@ -425,10 +425,12 @@ a { color: #006bb7; }
   .settings-start {
     grid-column: 1;
     grid-row: 1;
+    align-self: center;
   }
   .settings-end {
     grid-column: 3;
     grid-row: 1;
+    align-self: center;
   }
   .settings-center {
     grid-column: 1 / -1;
@@ -459,7 +461,6 @@ a { color: #006bb7; }
   /* Bigger trash/leave icon on mobile */
   .settings-end .bi-trash-fill {
     font-size: 1.6rem !important;
-    margin-top: 20px !important;
     margin-right: 0.85rem !important;
     margin-bottom: 0.85rem !important;
     display: inline-block;

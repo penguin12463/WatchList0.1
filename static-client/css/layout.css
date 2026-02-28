@@ -312,6 +312,17 @@ main {
   background: #fff !important;
 }
 
+/* ── Info page: scrollable main, locked sidebar + top bar ── */
+[data-page="info"] main {
+  overflow-y: auto;
+  height: 100vh;
+}
+
+[data-page="info"] .content {
+  overflow-y: visible;
+  min-height: unset;
+}
+
 /* ── Responsive / mobile ── */
 @media (max-width: 900px) {
   /* Allow the page to scroll vertically */

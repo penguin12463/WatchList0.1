@@ -427,6 +427,9 @@ app.get("/api/tmdb/search", async (c) => {
       year: r.media_type === "movie"
         ? (r.release_date || "").slice(0, 4)
         : (r.first_air_date || "").slice(0, 4),
+      runtime: r.media_type === "movie"
+        ? (r.runtime || null)
+        : (Array.isArray(r.episode_run_time) && r.episode_run_time.length ? r.episode_run_time[0] : null),
     }));
 
   return c.json({ results });

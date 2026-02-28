@@ -67,11 +67,14 @@ function _show(results) {
     titleSpan.style.flex = "1";
     titleSpan.textContent = r.title;
 
-    const yearSpan = document.createElement("span");
-    yearSpan.className = "tmdb-year";
-    yearSpan.textContent = r.year || "";
+    const metaSpan = document.createElement("span");
+    metaSpan.className = "tmdb-year";
+    const parts = [];
+    if (r.year) parts.push(r.year);
+    if (r.runtime) parts.push(`${r.runtime} min`);
+    metaSpan.textContent = parts.join(" · ");
 
-    item.append(icon, titleSpan, yearSpan);
+    item.append(icon, titleSpan, metaSpan);
 
     // mousedown fires before blur so we can capture the selection
     item.addEventListener("mousedown", async (e) => {

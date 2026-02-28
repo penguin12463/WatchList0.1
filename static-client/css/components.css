@@ -407,12 +407,14 @@ a { color: #006bb7; }
   margin-top: 10px;
 }
 
-.settings-delete-link .bi-trash-fill {
+.settings-delete-link .bi-trash-fill,
+.settings-end .bi-trash-fill {
   font-size: 4rem;
   color: red;
 }
 
-.settings-delete-link:hover .bi-trash-fill {
+.settings-delete-link:hover .bi-trash-fill,
+.settings-end button:hover .bi-trash-fill {
   opacity: 0.75;
 }
 

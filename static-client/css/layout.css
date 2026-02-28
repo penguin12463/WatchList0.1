@@ -8,6 +8,7 @@ html, body {
   margin: 0;
   overflow: hidden;
   overscroll-behavior: none;
+  background: #fff;
 }
 
 /* ── Mobile nav toggle button (hidden on desktop) ── */

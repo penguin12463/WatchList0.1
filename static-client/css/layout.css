@@ -316,12 +316,14 @@ main {
 [data-page="info"] main {
   overflow-y: auto;
   height: 100vh;
+  background: #2e2e2e;
 }
 
 [data-page="info"] .content {
   overflow-y: visible;
-  min-height: 100%;
+  min-height: unset;
   padding-bottom: 200px;
+  background: transparent;
 }
 
 /* ── Responsive / mobile ── */

@@ -316,7 +316,7 @@ main {
 [data-page="info"] main {
   overflow-y: auto;
   height: 100vh;
-  background: #2e2e2e;
+  background: #fff;
 }
 
 [data-page="info"] .content {

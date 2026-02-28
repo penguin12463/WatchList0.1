@@ -320,7 +320,8 @@ main {
 
 [data-page="info"] .content {
   overflow-y: visible;
-  min-height: unset;
+  min-height: 100%;
+  padding-bottom: 200px;
 }
 
 /* ── Responsive / mobile ── */

@@ -165,9 +165,12 @@ app.get("/api/lists/:id/movies", async (c) => {
   const sql = db(c.env);
 
   const rows = await sql`
-    select m.*
+    select m.id, m.title, m.media_type, m.tmdb_id, m.runtime, m.number_of_episodes,
+           m.created_by, m.created_at,
+           mp.watched_runtime, mp.watched_episodes, mp.rating
     from public.watchlist_movies wm
     join public.movies m on m.id = wm.movie_id
+    left join public.movie_progress mp on mp.movie_id = m.id and mp.user_id = ${userId}
     where wm.watchlist_id = ${listId}
       and public.is_watchlist_accessible(${listId}, ${userId})
     order by wm.position asc, wm.created_at asc
@@ -301,15 +304,14 @@ app.patch("/api/movies/:id", async (c) => {
 
   const sql = db(c.env);
 
-  const rows = await sql`
+  // Update shared movie metadata (title, type, total runtime/episodes) on the movies table.
+  // Only watched progress and rating are personal — those go into movie_progress.
+  const movieRows = await sql`
     update public.movies m
     set title = coalesce(${body.title ?? null}, title),
         media_type = coalesce(${body.media_type ?? null}, media_type),
         runtime = ${body.runtime ?? null},
-        number_of_episodes = ${body.number_of_episodes ?? null},
-        watched_runtime = ${body.watched_runtime ?? null},
-        watched_episodes = ${body.watched_episodes ?? null},
-        rating = ${body.rating ?? null}
+        number_of_episodes = ${body.number_of_episodes ?? null}
     where m.id = ${movieId}
       and exists (
         select 1
@@ -318,13 +320,32 @@ app.patch("/api/movies/:id", async (c) => {
         where wm.movie_id = m.id
           and public.is_watchlist_accessible(w.id, ${userId})
       )
-    returning m.id, m.title, m.media_type, m.runtime, m.number_of_episodes,
-              m.watched_runtime, m.watched_episodes, m.rating
+    returning m.id
   `;
 
-  if (!rows.length) {
+  if (!movieRows.length) {
     return c.json({ error: "Movie not found or inaccessible" }, 404);
   }
+
+  // Upsert per-user watch progress and rating so different users on a shared list
+  // each maintain their own independent progress.
+  await sql`
+    insert into public.movie_progress (user_id, movie_id, watched_runtime, watched_episodes, rating)
+    values (${userId}, ${movieId}, ${body.watched_runtime ?? null}, ${body.watched_episodes ?? null}, ${body.rating ?? null})
+    on conflict (user_id, movie_id) do update
+    set watched_runtime = excluded.watched_runtime,
+        watched_episodes = excluded.watched_episodes,
+        rating = excluded.rating
+  `;
+
+  // Return the full movie with this user's personal progress.
+  const rows = await sql`
+    select m.id, m.title, m.media_type, m.runtime, m.number_of_episodes,
+           mp.watched_runtime, mp.watched_episodes, mp.rating
+    from public.movies m
+    left join public.movie_progress mp on mp.movie_id = m.id and mp.user_id = ${userId}
+    where m.id = ${movieId}
+  `;
 
   return c.json(rows[0]);
 });

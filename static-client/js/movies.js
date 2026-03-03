@@ -100,7 +100,7 @@ export function buildMovieItem(movie) {
   // ══════════════════════════
   const editDiv = document.createElement("div");
   editDiv.className = "movie-item-edit-row hidden";
-  editDiv.style.cssText = "display:none;align-items:center;gap:8px;width:100%;flex-wrap:nowrap;";
+  editDiv.style.display = "none"; // layout controlled by .movie-item-edit-row CSS class (responsive)
 
   // Title input
   const titleInput = document.createElement("input");
@@ -108,12 +108,12 @@ export function buildMovieItem(movie) {
   titleInput.type = "text";
   titleInput.maxLength = 80;
   titleInput.placeholder = "Title";
-  titleInput.style.cssText = "width:140px;min-width:140px;flex:0 0 140px;padding:0 5px;";
+  // no inline style — .edit-title-input CSS class (and its responsive override) handles sizing
 
   // Type select
   const typeSelect = document.createElement("select");
   typeSelect.className = "form-select edit-type-select";
-  typeSelect.style.cssText = "width:auto;min-width:110px;padding:0 5px;";
+  // no inline style — .edit-type-select CSS class handles sizing
   typeSelect.innerHTML =
     `<option value="">Unknown</option>` +
     `<option value="movie">Movie</option>` +
@@ -122,7 +122,7 @@ export function buildMovieItem(movie) {
   // Rating select
   const ratingSelect = document.createElement("select");
   ratingSelect.className = "form-select edit-rating-select";
-  ratingSelect.style.cssText = "width:auto;min-width:100px;padding:0 5px;";
+  // no inline style — .edit-rating-select CSS class handles sizing
   ratingSelect.innerHTML =
     `<option value="">No rating</option>` +
     [1, 2, 3, 4, 5].map(n =>
@@ -165,7 +165,7 @@ export function buildMovieItem(movie) {
     w.min = "0";
     w.className = "form-control edit-num-input num-field";
     w.placeholder = "Watched";
-    w.style.cssText = "width:110px;padding:0 5px;";
+    // no inline style — .edit-num-input CSS class (and its responsive override) handles sizing
 
     const sep = document.createElement("span");
     sep.className = "num-field";
@@ -176,7 +176,7 @@ export function buildMovieItem(movie) {
     tot.min = "1";
     tot.className = "form-control edit-num-input num-field";
     tot.placeholder = t === "movie" ? "Total min" : "Total eps";
-    tot.style.cssText = "width:110px;padding:0 5px;";
+    // no inline style — .edit-num-input CSS class handles sizing
 
     watchedInput = w;
     totalInput = tot;

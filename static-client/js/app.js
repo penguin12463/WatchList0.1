@@ -327,11 +327,7 @@ async function selectList(list) {
     await loadMovies(list.id, moviesEl);
     hideTmdbResults();
     // Fetch sub-lists (collections) for this list
-    try {
-      const subs = await apiFetch(`/api/lists/${list.id}/sub-lists`);
-      activeSubLists = Array.isArray(subs) ? subs : [];
-      if (activeSubLists.length) renderLists();
-    } catch { activeSubLists = []; }
+    await refreshSubLists();
   } catch (err) {
     const msg = getErrorMessage(err).toLowerCase();
     if (msg.includes("unauthorized") && !clerk.user) {
@@ -342,8 +338,23 @@ async function selectList(list) {
   }
 }
 
+async function refreshSubLists() {
+  if (!activeParentList) return;
+  try {
+    const subs = await apiFetch(`/api/lists/${activeParentList.id}/sub-lists`);
+    activeSubLists = Array.isArray(subs) ? subs : [];
+  } catch { activeSubLists = []; }
+  renderLists();
+}
+window.refreshSubLists = refreshSubLists;
+
 async function selectCollection(collectionListId) {
-  const subList = activeSubLists.find(s => s.id === collectionListId);
+  let subList = activeSubLists.find(s => s.id === collectionListId);
+  if (!subList) {
+    // Sub-list not yet loaded — refresh and try again
+    await refreshSubLists();
+    subList = activeSubLists.find(s => s.id === collectionListId);
+  }
   if (!subList) return;
   activeList = subList;
   // activeParentList remains unchanged (the top-level list)

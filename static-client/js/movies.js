@@ -284,8 +284,13 @@ export function buildMovieItem(movie) {
         method: "PATCH",
         body: patch,
       });
+      const wasCollection = !!movie.collection_list_id;
       Object.assign(movie, updated);
       wrapper.replaceWith(buildMovieItem(movie));
+      // Refresh nav sub-lists if a collection was created, updated, or removed
+      if (t === 'collection' || wasCollection) {
+        window.refreshSubLists?.();
+      }
     } catch (err) {
       showStatus(getErrorMessage(err, "Unable to save"), true);
     }

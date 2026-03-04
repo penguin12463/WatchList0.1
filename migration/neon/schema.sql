@@ -144,6 +144,9 @@ begin
     select m.id into v_movie_id
     from public.movies m
     where m.media_type = p_media_type and m.tmdb_id = p_tmdb_id;
+  elsif p_media_type = 'collection' then
+    -- Collections are user-named with no external identity; never deduplicate across users.
+    v_movie_id := null;
   else
     select m.id into v_movie_id
     from public.movies m

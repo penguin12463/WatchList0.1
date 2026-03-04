@@ -241,7 +241,9 @@ export function buildMovieItem(movie) {
 
   saveBtn.addEventListener("click", async () => {
     const t = typeSelect.value;
+    const list = _getActiveList();
     const patch = {
+      list_id: list?.id ?? undefined,
       title: titleInput.value.trim() || movie.title,
       media_type: t || null,
       watched_runtime:      t === "movie" ? (Number(watchedInput?.value) || null) : null,

@@ -207,17 +207,33 @@ app.get("/api/lists/:id/movies", async (c) => {
   const listId = Number(c.req.param("id"));
   const sql = db(c.env);
 
-  const rows = await sql`
-    select m.id, m.title, m.media_type, m.tmdb_id, m.runtime, m.number_of_episodes,
-           m.created_by, m.created_at,
-           mp.watched_runtime, mp.watched_episodes, mp.rating
-    from public.watchlist_movies wm
-    join public.movies m on m.id = wm.movie_id
-    left join public.movie_progress mp on mp.movie_id = m.id and mp.user_id = ${userId}
-    where wm.watchlist_id = ${listId}
-      and public.is_watchlist_accessible(${listId}, ${userId})
-    order by wm.position asc, wm.created_at asc
-  `;
+  // Try per-user progress from movie_progress; fall back to shared columns if migration pending.
+  let rows;
+  try {
+    rows = await sql`
+      select m.id, m.title, m.media_type, m.tmdb_id, m.runtime, m.number_of_episodes,
+             m.created_by, m.created_at,
+             mp.watched_runtime, mp.watched_episodes, mp.rating
+      from public.watchlist_movies wm
+      join public.movies m on m.id = wm.movie_id
+      left join public.movie_progress mp on mp.movie_id = m.id and mp.user_id = ${userId}
+      where wm.watchlist_id = ${listId}
+        and public.is_watchlist_accessible(${listId}, ${userId})
+      order by wm.position asc, wm.created_at asc
+    `;
+  } catch {
+    // movie_progress table not yet created — fall back to shared columns on movies row.
+    rows = await sql`
+      select m.id, m.title, m.media_type, m.tmdb_id, m.runtime, m.number_of_episodes,
+             m.created_by, m.created_at,
+             m.watched_runtime, m.watched_episodes, m.rating
+      from public.watchlist_movies wm
+      join public.movies m on m.id = wm.movie_id
+      where wm.watchlist_id = ${listId}
+        and public.is_watchlist_accessible(${listId}, ${userId})
+      order by wm.position asc, wm.created_at asc
+    `;
+  }
 
   return c.json(rows);
 });
@@ -349,6 +365,7 @@ app.patch("/api/movies/:id", async (c) => {
   const userId = c.get("userId");
   const movieId = Number(c.req.param("id"));
   const body = await c.req.json<{
+    list_id?: number;
     title?: string | null;
     media_type?: string | null;
     runtime?: number | null;
@@ -360,50 +377,100 @@ app.patch("/api/movies/:id", async (c) => {
 
   const sql = db(c.env);
 
-  // Update shared movie metadata (title, type, total runtime/episodes) on the movies table.
-  // Only watched progress and rating are personal — those go into movie_progress.
-  const movieRows = await sql`
-    update public.movies m
-    set title = coalesce(${body.title ?? null}, title),
-        media_type = coalesce(${body.media_type ?? null}, media_type),
-        runtime = ${body.runtime ?? null},
-        number_of_episodes = ${body.number_of_episodes ?? null}
-    where m.id = ${movieId}
-      and exists (
-        select 1
-        from public.watchlist_movies wm
-        join public.watchlists w on w.id = wm.watchlist_id
-        where wm.movie_id = m.id
-          and public.is_watchlist_accessible(w.id, ${userId})
-      )
-    returning m.id
-  `;
-
-  if (!movieRows.length) {
-    return c.json({ error: "Movie not found or inaccessible" }, 404);
+  // If a list_id is provided, check whether the list is read-only for this user.
+  // Non-owners on a read-only list may not edit shared movie metadata.
+  let canEditShared = true;
+  if (body.list_id) {
+    try {
+      const access = await sql`
+        SELECT access_type, is_read_only FROM public.v_user_watchlists
+        WHERE id = ${body.list_id} AND user_id = ${userId}
+      `;
+      if (access.length) {
+        canEditShared = !access[0].is_read_only || access[0].access_type === "owner";
+      }
+    } catch {
+      // is_read_only migration not yet applied — allow edit (safe default).
+    }
   }
 
-  // Upsert per-user watch progress and rating so different users on a shared list
-  // each maintain their own independent progress.
-  await sql`
-    insert into public.movie_progress (user_id, movie_id, watched_runtime, watched_episodes, rating)
-    values (${userId}, ${movieId}, ${body.watched_runtime ?? null}, ${body.watched_episodes ?? null}, ${body.rating ?? null})
-    on conflict (user_id, movie_id) do update
-    set watched_runtime = excluded.watched_runtime,
-        watched_episodes = excluded.watched_episodes,
-        rating = excluded.rating
-  `;
+  if (canEditShared) {
+    // Update shared movie metadata (title, type, total runtime/episodes) on the movies table.
+    const movieRows = await sql`
+      update public.movies m
+      set title = coalesce(${body.title ?? null}, title),
+          media_type = coalesce(${body.media_type ?? null}, media_type),
+          runtime = ${body.runtime ?? null},
+          number_of_episodes = ${body.number_of_episodes ?? null}
+      where m.id = ${movieId}
+        and exists (
+          select 1
+          from public.watchlist_movies wm
+          join public.watchlists w on w.id = wm.watchlist_id
+          where wm.movie_id = m.id
+            and public.is_watchlist_accessible(w.id, ${userId})
+        )
+      returning m.id
+    `;
+    if (!movieRows.length) {
+      return c.json({ error: "Movie not found or inaccessible" }, 404);
+    }
+  } else {
+    // Read-only list: verify access without updating shared fields.
+    const accessRows = await sql`
+      SELECT m.id FROM public.movies m
+      WHERE m.id = ${movieId}
+        AND EXISTS (
+          SELECT 1 FROM public.watchlist_movies wm
+          WHERE wm.movie_id = m.id
+            AND public.is_watchlist_accessible(wm.watchlist_id, ${userId})
+        )
+    `;
+    if (!accessRows.length) {
+      return c.json({ error: "Movie not found or inaccessible" }, 404);
+    }
+  }
+
+  // Upsert per-user watch progress and rating — always personal, unaffected by read-only.
+  // Falls back to movies table columns if the migration hasn't run yet.
+  try {
+    await sql`
+      insert into public.movie_progress (user_id, movie_id, watched_runtime, watched_episodes, rating)
+      values (${userId}, ${movieId}, ${body.watched_runtime ?? null}, ${body.watched_episodes ?? null}, ${body.rating ?? null})
+      on conflict (user_id, movie_id) do update
+      set watched_runtime = excluded.watched_runtime,
+          watched_episodes = excluded.watched_episodes,
+          rating = excluded.rating
+    `;
+  } catch {
+    // movie_progress table not yet created — fall back to shared columns on movies row.
+    await sql`
+      UPDATE public.movies
+      SET watched_runtime = ${body.watched_runtime ?? null},
+          watched_episodes = ${body.watched_episodes ?? null},
+          rating = ${body.rating ?? null}
+      WHERE id = ${movieId}
+    `;
+  }
 
   // Return the full movie with this user's personal progress.
-  const rows = await sql`
-    select m.id, m.title, m.media_type, m.runtime, m.number_of_episodes,
-           mp.watched_runtime, mp.watched_episodes, mp.rating
-    from public.movies m
-    left join public.movie_progress mp on mp.movie_id = m.id and mp.user_id = ${userId}
-    where m.id = ${movieId}
-  `;
-
-  return c.json(rows[0]);
+  try {
+    const rows = await sql`
+      select m.id, m.title, m.media_type, m.runtime, m.number_of_episodes,
+             mp.watched_runtime, mp.watched_episodes, mp.rating
+      from public.movies m
+      left join public.movie_progress mp on mp.movie_id = m.id and mp.user_id = ${userId}
+      where m.id = ${movieId}
+    `;
+    return c.json(rows[0]);
+  } catch {
+    const rows = await sql`
+      SELECT id, title, media_type, runtime, number_of_episodes,
+             watched_runtime, watched_episodes, rating
+      FROM public.movies WHERE id = ${movieId}
+    `;
+    return c.json(rows[0]);
+  }
 });
 
 app.patch("/api/lists/:id/movies/reorder", async (c) => {

@@ -90,14 +90,14 @@ export function buildMovieItem(movie) {
     viewNodes.push(ratingSpan);
   }
 
-  // Edit button (btn-link style, blue pen with black outline)
+  // Edit button — hidden entirely for non-owners on read-only lists
   const editBtn = document.createElement("button");
   editBtn.type = "button";
   editBtn.className = "movie-item-edit-btn";
   editBtn.innerHTML =
     `<span class="bi bi-pen-fill" style="vertical-align:top;scale:1;` +
     `color:#60a5fa;text-shadow:-1px 0 #000,0 1px #000,1px 0 #000,0 -1px #000;"></span>`;
-  viewNodes.push(editBtn);
+  if (!isReadOnly) viewNodes.push(editBtn);
 
   viewNodes.forEach(n => wrapper.appendChild(n));
 

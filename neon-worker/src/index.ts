@@ -432,9 +432,9 @@ app.patch("/api/movies/:id", async (c) => {
     }
   }
 
-  // Upsert shared per-list watch progress (all list members share the same record).
+  // Upsert shared per-list watch progress — blocked for non-owners on read-only lists.
   // Falls back to movies table columns if the migration hasn't run yet.
-  if (body.list_id) {
+  if (body.list_id && canEditShared) {
     try {
       await sql`
         insert into public.movie_progress (movie_id, watchlist_id, watched_runtime, watched_episodes, rating)

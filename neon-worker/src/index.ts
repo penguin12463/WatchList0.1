@@ -78,12 +78,23 @@ app.get("/api/lists", async (c) => {
   const userId = c.get("userId");
   const sql = db(c.env);
 
-  const rows = await sql`
-    select id, name, owner_id, access_type, is_read_only, created_at
-    from public.v_user_watchlists
-    where user_id = ${userId}
-    order by created_at asc
-  `;
+  // Try to read is_read_only from the updated view; fallback if migration hasn't run yet.
+  let rows;
+  try {
+    rows = await sql`
+      select id, name, owner_id, access_type, is_read_only, created_at
+      from public.v_user_watchlists
+      where user_id = ${userId}
+      order by created_at asc
+    `;
+  } catch {
+    rows = await sql`
+      select id, name, owner_id, access_type, false as is_read_only, created_at
+      from public.v_user_watchlists
+      where user_id = ${userId}
+      order by created_at asc
+    `;
+  }
 
   return c.json(rows);
 });
@@ -94,14 +105,27 @@ app.get("/api/lists/:id/info", async (c) => {
   const listId = Number(c.req.param("id"));
   const sql = db(c.env);
 
-  const rows = await sql`
-    select v.id, v.name, v.owner_id, v.access_type, v.is_read_only,
-           p.username as owner_username
-    from public.v_user_watchlists v
-    join public.profiles p on p.id = v.owner_id
-    where v.id = ${listId} and v.user_id = ${userId}
-    limit 1
-  `;
+  // Try to read is_read_only from the updated view; fallback if migration hasn't run yet.
+  let rows;
+  try {
+    rows = await sql`
+      select v.id, v.name, v.owner_id, v.access_type, v.is_read_only,
+             p.username as owner_username
+      from public.v_user_watchlists v
+      join public.profiles p on p.id = v.owner_id
+      where v.id = ${listId} and v.user_id = ${userId}
+      limit 1
+    `;
+  } catch {
+    rows = await sql`
+      select v.id, v.name, v.owner_id, v.access_type, false as is_read_only,
+             p.username as owner_username
+      from public.v_user_watchlists v
+      join public.profiles p on p.id = v.owner_id
+      where v.id = ${listId} and v.user_id = ${userId}
+      limit 1
+    `;
+  }
 
   if (!rows.length) {
     return c.json({ error: "List not found or inaccessible" }, 404);
@@ -138,14 +162,29 @@ app.patch("/api/lists/:id", async (c) => {
   }
 
   const sql = db(c.env);
-  const rows = await sql`
-    update public.watchlists
-    set
-      name = case when ${hasName}::boolean then ${name}::text else name end,
-      is_read_only = case when ${hasReadOnly}::boolean then ${body.is_read_only ?? false}::boolean else is_read_only end
-    where id = ${listId} and owner_id = ${userId}
-    returning id, name, is_read_only
-  `;
+  // Try to update is_read_only; if the column doesn't exist yet (migration pending),
+  // fall back to a name-only update.
+  let rows;
+  try {
+    rows = await sql`
+      update public.watchlists
+      set
+        name = case when ${hasName}::boolean then ${name}::text else name end,
+        is_read_only = case when ${hasReadOnly}::boolean then ${body.is_read_only ?? false}::boolean else is_read_only end
+      where id = ${listId} and owner_id = ${userId}
+      returning id, name, is_read_only
+    `;
+  } catch {
+    if (!hasName) {
+      return c.json({ error: "Migration required to use read-only setting" }, 503);
+    }
+    rows = await sql`
+      update public.watchlists
+      set name = ${name}
+      where id = ${listId} and owner_id = ${userId}
+      returning id, name
+    `;
+  }
 
   if (!rows.length) {
     return c.json({ error: "List not found or not owned by user" }, 404);
@@ -264,14 +303,17 @@ app.post("/api/lists/:id/movies", async (c) => {
   const sql = db(c.env);
 
   // Block writes when the list is read-only and the requester is not the owner.
-  const accessCheck = await sql`
-    SELECT access_type, is_read_only FROM public.v_user_watchlists
-    WHERE id = ${listId} AND user_id = ${userId}
-  `;
-  if (!accessCheck.length) return c.json({ error: "List not found or inaccessible" }, 404);
-  if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
-    return c.json({ error: "This list is read-only" }, 403);
-  }
+  // Skipped gracefully if the migration hasn't run yet (is_read_only column missing).
+  try {
+    const accessCheck = await sql`
+      SELECT access_type, is_read_only FROM public.v_user_watchlists
+      WHERE id = ${listId} AND user_id = ${userId}
+    `;
+    if (!accessCheck.length) return c.json({ error: "List not found or inaccessible" }, 404);
+    if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
+      return c.json({ error: "This list is read-only" }, 403);
+    }
+  } catch { /* migration pending — allow the write */ }
 
   const rows = await sql`
     select public.add_movie_to_watchlist(
@@ -376,16 +418,31 @@ app.patch("/api/lists/:id/movies/reorder", async (c) => {
 
   const sql = db(c.env);
 
-  // Verify access (owner or shared — not invited; and not read-only for non-owners)
-  const access = await sql`
-    SELECT access_type, is_read_only FROM public.v_user_watchlists
-    WHERE id = ${listId} AND user_id = ${userId}
-  `;
-  if (!access.length || access[0].access_type === "invited") {
-    return c.json({ error: "Forbidden" }, 403);
-  }
-  if (access[0].is_read_only && access[0].access_type !== "owner") {
-    return c.json({ error: "This list is read-only" }, 403);
+  // Verify access (owner or shared — not invited; and not read-only for non-owners).
+  // is_read_only check is skipped gracefully if the migration hasn't run yet.
+  let accessType: string;
+  try {
+    const access = await sql`
+      SELECT access_type, is_read_only FROM public.v_user_watchlists
+      WHERE id = ${listId} AND user_id = ${userId}
+    `;
+    if (!access.length || access[0].access_type === "invited") {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+    if (access[0].is_read_only && access[0].access_type !== "owner") {
+      return c.json({ error: "This list is read-only" }, 403);
+    }
+    accessType = access[0].access_type;
+  } catch {
+    // Fallback without is_read_only (migration pending)
+    const access = await sql`
+      SELECT access_type FROM public.v_user_watchlists
+      WHERE id = ${listId} AND user_id = ${userId}
+    `;
+    if (!access.length || access[0].access_type === "invited") {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+    accessType = access[0].access_type;
   }
 
   // Update every movie's position in one statement via unnest
@@ -411,14 +468,17 @@ app.delete("/api/lists/:listId/movies/:movieId", async (c) => {
   const sql = db(c.env);
 
   // Block non-owners on read-only lists.
-  const accessCheck = await sql`
-    SELECT access_type, is_read_only FROM public.v_user_watchlists
-    WHERE id = ${listId} AND user_id = ${userId}
-  `;
-  if (!accessCheck.length) return c.body(null, 404);
-  if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
-    return c.json({ error: "This list is read-only" }, 403);
-  }
+  // Skipped gracefully if the migration hasn't run yet (is_read_only column missing).
+  try {
+    const accessCheck = await sql`
+      SELECT access_type, is_read_only FROM public.v_user_watchlists
+      WHERE id = ${listId} AND user_id = ${userId}
+    `;
+    if (!accessCheck.length) return c.body(null, 404);
+    if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
+      return c.json({ error: "This list is read-only" }, 403);
+    }
+  } catch { /* migration pending — allow the delete */ }
 
   await sql`
     delete from public.watchlist_movies wm

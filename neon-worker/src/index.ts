@@ -207,7 +207,7 @@ app.get("/api/lists/:id/movies", async (c) => {
   const listId = Number(c.req.param("id"));
   const sql = db(c.env);
 
-  // Try per-user per-list progress from movie_progress; fall back if migration pending.
+  // Progress is shared per list — joined on (movie_id, watchlist_id), no user filter.
   let rows;
   try {
     rows = await sql`
@@ -217,7 +217,7 @@ app.get("/api/lists/:id/movies", async (c) => {
       from public.watchlist_movies wm
       join public.movies m on m.id = wm.movie_id
       left join public.movie_progress mp
-        on mp.movie_id = m.id and mp.user_id = ${userId} and mp.watchlist_id = ${listId}
+        on mp.movie_id = m.id and mp.watchlist_id = ${listId}
       where wm.watchlist_id = ${listId}
         and public.is_watchlist_accessible(${listId}, ${userId})
       order by wm.position asc, wm.created_at asc
@@ -432,14 +432,14 @@ app.patch("/api/movies/:id", async (c) => {
     }
   }
 
-  // Upsert per-user per-list watch progress — always personal, unaffected by read-only.
+  // Upsert shared per-list watch progress (all list members share the same record).
   // Falls back to movies table columns if the migration hasn't run yet.
   if (body.list_id) {
     try {
       await sql`
-        insert into public.movie_progress (user_id, movie_id, watchlist_id, watched_runtime, watched_episodes, rating)
-        values (${userId}, ${movieId}, ${body.list_id}, ${body.watched_runtime ?? null}, ${body.watched_episodes ?? null}, ${body.rating ?? null})
-        on conflict (user_id, movie_id, watchlist_id) do update
+        insert into public.movie_progress (movie_id, watchlist_id, watched_runtime, watched_episodes, rating)
+        values (${movieId}, ${body.list_id}, ${body.watched_runtime ?? null}, ${body.watched_episodes ?? null}, ${body.rating ?? null})
+        on conflict (movie_id, watchlist_id) do update
         set watched_runtime = excluded.watched_runtime,
             watched_episodes = excluded.watched_episodes,
             rating = excluded.rating
@@ -456,14 +456,14 @@ app.patch("/api/movies/:id", async (c) => {
     }
   }
 
-  // Return the full movie with this user's personal progress for this list.
+  // Return the movie with progress for this list.
   try {
     const rows = await sql`
       select m.id, m.title, m.media_type, m.runtime, m.number_of_episodes,
              mp.watched_runtime, mp.watched_episodes, mp.rating
       from public.movies m
       left join public.movie_progress mp
-        on mp.movie_id = m.id and mp.user_id = ${userId} and mp.watchlist_id = ${body.list_id ?? null}
+        on mp.movie_id = m.id and mp.watchlist_id = ${body.list_id ?? null}
       where m.id = ${movieId}
     `;
     return c.json(rows[0]);

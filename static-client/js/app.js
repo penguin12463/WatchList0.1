@@ -301,11 +301,20 @@ function configureListControls() {
     }
   }
 
-  // Hide "Collection" option from add-type-select when inside a collection sub-list
+  // Remove "Collection" option from add-type-select when inside a collection sub-list
   if (addTypeSelectEl) {
-    const collectionOption = addTypeSelectEl.querySelector('option[value="collection"]');
-    if (collectionOption) collectionOption.style.display = isSubList ? "none" : "";
-    if (isSubList && addTypeSelectEl.value === "collection") addTypeSelectEl.value = "";
+    const existing = addTypeSelectEl.querySelector('option[value="collection"]');
+    if (isSubList) {
+      if (existing) existing.remove();
+      if (addTypeSelectEl.value === "collection") addTypeSelectEl.value = "";
+    } else {
+      if (!existing) {
+        const opt = document.createElement("option");
+        opt.value = "collection";
+        opt.textContent = "Collection";
+        addTypeSelectEl.appendChild(opt);
+      }
+    }
   }
 
   const hasListSelected = !!activeList;

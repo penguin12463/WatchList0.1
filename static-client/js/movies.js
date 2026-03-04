@@ -95,25 +95,16 @@ export function buildMovieItem(movie) {
     viewNodes.push(ratingSpan);
   }
 
-  // Right-side button group — pen first, then arrow (collections), grouped together at far right
+  // Right-side button group — arrow (collections) then pen, grouped together at far right
   const rightGroup = document.createElement("span");
   rightGroup.style.cssText = "margin-left:auto;display:inline-flex;align-items:center;gap:2px;flex-shrink:0;";
-
-  // Edit button — hidden entirely for non-owners on read-only lists
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.className = "movie-item-edit-btn";
-  editBtn.innerHTML =
-    `<span class="bi bi-pen-fill" style="vertical-align:top;scale:1;` +
-    `color:#60a5fa;text-shadow:-1px 0 #000,0 1px #000,1px 0 #000,0 -1px #000;"></span>`;
-  if (!isReadOnly) rightGroup.appendChild(editBtn);
 
   if (isCollection && movie.collection_list_id) {
     const arrowBtn = document.createElement("button");
     arrowBtn.type = "button";
     arrowBtn.className = "movie-item-collection-btn";
     arrowBtn.title = "Open collection";
-    arrowBtn.innerHTML = `<span class="bi bi-arrow-right-circle-fill" style="vertical-align:top;color:#60a5fa;text-shadow:-1px 0 #000,0 1px #000,1px 0 #000,0 -1px #000;"></span>`;
+    arrowBtn.innerHTML = `<span class="bi bi-arrow-right-circle-fill" style="vertical-align:top;color:#60a5fa;"></span>`;
     arrowBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (typeof window.selectCollection === "function") {
@@ -122,6 +113,14 @@ export function buildMovieItem(movie) {
     });
     rightGroup.appendChild(arrowBtn);
   }
+
+  // Edit button — hidden entirely for non-owners on read-only lists
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "movie-item-edit-btn";
+  editBtn.innerHTML =
+    `<span class="bi bi-pen-fill" style="vertical-align:top;scale:1;color:#60a5fa;"></span>`;
+  if (!isReadOnly) rightGroup.appendChild(editBtn);
 
   if (rightGroup.children.length) viewNodes.push(rightGroup);
 
@@ -310,6 +309,7 @@ export function buildMovieItem(movie) {
         method: "DELETE",
       });
       wrapper.remove();
+      if (isCollection) window.refreshSubLists?.();
     } catch (err) {
       showStatus(getErrorMessage(err, "Unable to remove"), true);
     }

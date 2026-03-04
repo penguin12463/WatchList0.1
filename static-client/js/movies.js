@@ -95,9 +95,18 @@ export function buildMovieItem(movie) {
     viewNodes.push(ratingSpan);
   }
 
-  // Right-side button group — arrow (collections) + edit pen, grouped together at far right
+  // Right-side button group — pen first, then arrow (collections), grouped together at far right
   const rightGroup = document.createElement("span");
   rightGroup.style.cssText = "margin-left:auto;display:inline-flex;align-items:center;gap:2px;flex-shrink:0;";
+
+  // Edit button — hidden entirely for non-owners on read-only lists
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "movie-item-edit-btn";
+  editBtn.innerHTML =
+    `<span class="bi bi-pen-fill" style="vertical-align:top;scale:1;` +
+    `color:#60a5fa;text-shadow:-1px 0 #000,0 1px #000,1px 0 #000,0 -1px #000;"></span>`;
+  if (!isReadOnly) rightGroup.appendChild(editBtn);
 
   if (isCollection && movie.collection_list_id) {
     const arrowBtn = document.createElement("button");
@@ -113,15 +122,6 @@ export function buildMovieItem(movie) {
     });
     rightGroup.appendChild(arrowBtn);
   }
-
-  // Edit button — hidden entirely for non-owners on read-only lists
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.className = "movie-item-edit-btn";
-  editBtn.innerHTML =
-    `<span class="bi bi-pen-fill" style="vertical-align:top;scale:1;` +
-    `color:#60a5fa;text-shadow:-1px 0 #000,0 1px #000,1px 0 #000,0 -1px #000;"></span>`;
-  if (!isReadOnly) rightGroup.appendChild(editBtn);
 
   if (rightGroup.children.length) viewNodes.push(rightGroup);
 

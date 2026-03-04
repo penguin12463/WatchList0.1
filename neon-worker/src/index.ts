@@ -355,7 +355,8 @@ app.post("/api/lists/:id/movies", async (c) => {
 
   // If no tmdb_id was provided (user typed title manually without picking from autocomplete),
   // auto-search TMDB and use the top result so we always have a unique ID to deduplicate on.
-  if (!body.tmdb_id && c.env.TMDB_API_KEY) {
+  // Skip for collections — they are user-named and have no TMDB backing.
+  if (!body.tmdb_id && body.media_type !== 'collection' && c.env.TMDB_API_KEY) {
     try {
       const searchUrl = `${TMDB_BASE}/search/multi?api_key=${c.env.TMDB_API_KEY}&query=${encodeURIComponent(title)}&include_adult=false&page=1`;
       const searchResp = await fetch(searchUrl);

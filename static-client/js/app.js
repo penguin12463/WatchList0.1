@@ -21,6 +21,7 @@ const moviesEl          = document.getElementById("movies");
 const titleRowEl        = document.getElementById("title-row");
 const currentTitleEl    = document.getElementById("current-list-title");
 const settingsLinkEl    = document.getElementById("settings-link");
+const backBtnEl         = document.getElementById("back-btn");
 const welcomeScreenEl   = document.getElementById("welcome-screen");
 const welcomeHeadingEl  = document.getElementById("welcome-heading");
 const welcomeSubEl      = document.getElementById("welcome-sub");
@@ -290,15 +291,19 @@ function configureListControls() {
 
   if (settingsLinkEl) {
     if (isSubList) {
-      // visibility:hidden (not display:none) so the grid column keeps its width and title stays centred
-      settingsLinkEl.style.visibility = "hidden";
+      settingsLinkEl.style.display = "none";
     } else {
-      settingsLinkEl.style.visibility = "";
+      settingsLinkEl.style.display = "";
       const settingsListId = activeParentList?.id ?? activeList?.id;
       settingsLinkEl.href = settingsListId
         ? `./settings.html?listId=${settingsListId}`
         : "./settings.html";
     }
+  }
+
+  if (backBtnEl) {
+    backBtnEl.style.display = isSubList ? "" : "none";
+    backBtnEl.onclick = () => { if (activeParentList) selectList(activeParentList); };
   }
 
   // Remove "Collection" option from add-type-select when inside a collection sub-list

@@ -62,11 +62,12 @@ create table if not exists public.watchlist_share_invitations (
 create table if not exists public.movie_progress (
   user_id text not null references public.profiles(id) on delete cascade,
   movie_id bigint not null references public.movies(id) on delete cascade,
+  watchlist_id bigint not null references public.watchlists(id) on delete cascade,
   watched_runtime integer null,
   watched_episodes integer null,
   rating integer null check (rating between 1 and 5),
   updated_at timestamptz not null default now(),
-  primary key (user_id, movie_id)
+  primary key (user_id, movie_id, watchlist_id)
 );
 
 create index if not exists idx_watchlists_owner_id on public.watchlists(owner_id);
@@ -74,7 +75,7 @@ create index if not exists idx_movies_created_by on public.movies(created_by);
 create index if not exists idx_watchlist_movies_movie_id on public.watchlist_movies(movie_id);
 create index if not exists idx_watchlist_shares_user_id on public.watchlist_shares(user_id);
 create index if not exists idx_watchlist_invites_user_id on public.watchlist_share_invitations(user_id);
-create index if not exists idx_movie_progress_movie_id on public.movie_progress(movie_id);
+create index if not exists idx_movie_progress_lookup on public.movie_progress(movie_id, watchlist_id);
 
 create or replace function public.is_watchlist_accessible(p_watchlist_id bigint, p_user text)
 returns boolean

@@ -465,3 +465,16 @@ main {
     padding: 0.25rem 0.4rem;
   }
 }
+
+/* Base (mobile) size for title-row icons */
+#settings-link .bi,
+#back-btn .bi {
+  font-size: 1.75rem;
+}
+
+@media (min-width: 901px) {
+  #settings-link .bi,
+  #back-btn .bi {
+    font-size: 1.25rem;
+  }
+}

@@ -252,10 +252,10 @@ app.get("/api/lists/:id/sub-lists", async (c) => {
   try {
     const rows = await sql`
       select w.id, w.name, w.owner_id, w.parent_list_id, w.created_at,
-             case when w.owner_id = ${userId} then 'owner' else 'shared' end as access_type,
-             coalesce(pw.is_read_only, false) as is_read_only
+             v.access_type,
+             coalesce(v.is_read_only, false) as is_read_only
       from public.watchlists w
-      left join public.watchlists pw on pw.id = w.parent_list_id
+      join public.v_user_watchlists v on v.id = w.parent_list_id and v.user_id = ${userId}
       where w.parent_list_id = ${listId}
       order by w.created_at asc
     `;

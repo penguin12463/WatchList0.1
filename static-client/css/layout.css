@@ -188,6 +188,7 @@ main {
 .nav-item .drag-handle {
   opacity: 0;
   cursor: grab;
+  margin-left: auto;
   flex-shrink: 0;
   color: #aaa;
   transition: opacity 0.15s;

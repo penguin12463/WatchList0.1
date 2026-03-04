@@ -102,21 +102,18 @@ function renderLists() {
       btn.type = "button";
       btn.className = "nav-link" + (activeList?.id === list.id ? " active" : "");
 
-      if (list.access_type === "owner") {
-        const handle = document.createElement("span");
-        handle.className = "bi bi-grip-vertical drag-handle";
-        handle.title = "Drag to reorder";
-        btn.appendChild(handle);
-        item.draggable = true;
-        item.dataset.listId = String(list.id);
-      }
-
       const icon = document.createElement("span");
       icon.className = "bi bi-list-nested";
       icon.style.verticalAlign = "middle";
 
-      btn.append(icon, ` ${list.name}`);
+      const handle = document.createElement("span");
+      handle.className = "bi bi-grip-vertical drag-handle";
+      handle.title = "Drag to reorder";
+
+      btn.append(icon, ` ${list.name}`, handle);
       btn.addEventListener("click", () => selectList(list));
+      item.draggable = true;
+      item.dataset.listId = String(list.id);
       item.appendChild(btn);
     }
 

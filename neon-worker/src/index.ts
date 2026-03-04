@@ -78,15 +78,16 @@ app.get("/api/lists", async (c) => {
   const userId = c.get("userId");
   const sql = db(c.env);
 
-  // Try to read is_read_only + position from the view/table; fallback if migration hasn't run.
+  // Try to read is_read_only + personal position from user_list_positions; fallback if migration pending.
   let rows;
   try {
     rows = await sql`
-      select v.id, v.name, v.owner_id, v.access_type, v.is_read_only, v.created_at, w.position
+      select v.id, v.name, v.owner_id, v.access_type, v.is_read_only, v.created_at
       from public.v_user_watchlists v
-      join public.watchlists w on w.id = v.id
+      left join public.user_list_positions ulp
+        on ulp.watchlist_id = v.id and ulp.user_id = ${userId}
       where v.user_id = ${userId}
-      order by w.position asc nulls last, v.created_at asc
+      order by ulp.position asc nulls last, v.created_at asc
     `;
   } catch {
     rows = await sql`
@@ -161,17 +162,17 @@ app.patch("/api/lists/reorder", async (c) => {
 
   const sql = db(c.env);
 
-  // Only update lists owned by this user — shared/invited lists can't be reordered.
+  // Upsert personal positions for all list types (owned, shared, invited).
   await sql`
-    UPDATE public.watchlists w
-    SET position = vals.pos
+    INSERT INTO public.user_list_positions (user_id, watchlist_id, position)
+    SELECT ${userId}, vals.list_id, vals.pos
     FROM (
       SELECT
         unnest(${ids}::int[]) AS list_id,
         generate_series(0, ${ids.length - 1}) AS pos
     ) AS vals
-    WHERE w.id = vals.list_id
-      AND w.owner_id = ${userId}
+    ON CONFLICT (user_id, watchlist_id) DO UPDATE
+      SET position = excluded.position
   `;
 
   return c.body(null, 204);

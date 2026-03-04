@@ -14,7 +14,6 @@ create table if not exists public.watchlists (
   name text not null check (char_length(name) between 1 and 50),
   owner_id text not null references public.profiles(id) on delete cascade,
   is_read_only boolean not null default false,
-  position integer null,
   created_at timestamptz not null default now()
 );
 
@@ -76,6 +75,15 @@ create index if not exists idx_watchlist_movies_movie_id on public.watchlist_mov
 create index if not exists idx_watchlist_shares_user_id on public.watchlist_shares(user_id);
 create index if not exists idx_watchlist_invites_user_id on public.watchlist_share_invitations(user_id);
 create index if not exists idx_movie_progress_watchlist on public.movie_progress(watchlist_id);
+
+create table if not exists public.user_list_positions (
+  user_id      text   not null references public.profiles(id) on delete cascade,
+  watchlist_id bigint not null references public.watchlists(id) on delete cascade,
+  position     integer not null default 0,
+  primary key (user_id, watchlist_id)
+);
+
+create index if not exists idx_user_list_positions_user on public.user_list_positions(user_id);
 
 create or replace function public.is_watchlist_accessible(p_watchlist_id bigint, p_user text)
 returns boolean

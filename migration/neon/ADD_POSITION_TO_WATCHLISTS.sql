@@ -1,18 +1,13 @@
--- Migration: Add position column to watchlists for user-defined nav ordering
--- Only the list owner can reorder their lists; position is stored on the watchlists row.
--- Safe to run multiple times (ADD COLUMN IF NOT EXISTS, UPDATE ... WHERE position IS NULL).
+-- Migration: Add user_list_positions table for personal nav ordering
+-- Stores each user's preferred order for all their lists (owned, shared, and invited).
+-- Safe to run multiple times (CREATE TABLE IF NOT EXISTS).
 
--- 1. Add the column (nullable — back-filled below)
-ALTER TABLE public.watchlists
-  ADD COLUMN IF NOT EXISTS position integer;
+CREATE TABLE IF NOT EXISTS public.user_list_positions (
+  user_id      text   NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  watchlist_id bigint NOT NULL REFERENCES public.watchlists(id) ON DELETE CASCADE,
+  position     integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, watchlist_id)
+);
 
--- 2. Back-fill: assign sequential positions per owner ordered by created_at
-UPDATE public.watchlists w
-SET position = sub.pos
-FROM (
-  SELECT id,
-    ROW_NUMBER() OVER (PARTITION BY owner_id ORDER BY created_at) - 1 AS pos
-  FROM public.watchlists
-) sub
-WHERE w.id = sub.id
-  AND w.position IS NULL;
+CREATE INDEX IF NOT EXISTS idx_user_list_positions_user
+  ON public.user_list_positions(user_id);

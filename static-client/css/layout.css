@@ -184,6 +184,30 @@ main {
   color: #fff;
 }
 
+/* List nav drag-and-drop */
+.nav-item .drag-handle {
+  opacity: 0;
+  cursor: grab;
+  flex-shrink: 0;
+  color: #aaa;
+  transition: opacity 0.15s;
+}
+.nav-item:hover .drag-handle {
+  opacity: 1;
+}
+.nav-item .drag-handle:active {
+  cursor: grabbing;
+}
+.nav-item.dragging {
+  opacity: 0.4;
+}
+.nav-item.drag-over-top .nav-link {
+  border-top: 2px solid #60a5fa;
+}
+.nav-item.drag-over-bottom .nav-link {
+  border-bottom: 2px solid #60a5fa;
+}
+
 /* Pending invite clock icon (yellow) */
 .pending-clock-icon {
   color: #fef08a;

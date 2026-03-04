@@ -78,14 +78,15 @@ app.get("/api/lists", async (c) => {
   const userId = c.get("userId");
   const sql = db(c.env);
 
-  // Try to read is_read_only from the updated view; fallback if migration hasn't run yet.
+  // Try to read is_read_only + position from the view/table; fallback if migration hasn't run.
   let rows;
   try {
     rows = await sql`
-      select id, name, owner_id, access_type, is_read_only, created_at
-      from public.v_user_watchlists
-      where user_id = ${userId}
-      order by created_at asc
+      select v.id, v.name, v.owner_id, v.access_type, v.is_read_only, v.created_at, w.position
+      from public.v_user_watchlists v
+      join public.watchlists w on w.id = v.id
+      where v.user_id = ${userId}
+      order by w.position asc nulls last, v.created_at asc
     `;
   } catch {
     rows = await sql`
@@ -147,6 +148,33 @@ app.post("/api/lists", async (c) => {
   `;
 
   return c.json(rows[0], 201);
+});
+
+app.patch("/api/lists/reorder", async (c) => {
+  const userId = c.get("userId");
+  const body = await c.req.json<{ ids: number[] }>();
+  const ids = body.ids;
+
+  if (!Array.isArray(ids) || !ids.length) {
+    return c.json({ error: "ids array required" }, 400);
+  }
+
+  const sql = db(c.env);
+
+  // Only update lists owned by this user — shared/invited lists can't be reordered.
+  await sql`
+    UPDATE public.watchlists w
+    SET position = vals.pos
+    FROM (
+      SELECT
+        unnest(${ids}::int[]) AS list_id,
+        generate_series(0, ${ids.length - 1}) AS pos
+    ) AS vals
+    WHERE w.id = vals.list_id
+      AND w.owner_id = ${userId}
+  `;
+
+  return c.body(null, 204);
 });
 
 app.patch("/api/lists/:id", async (c) => {

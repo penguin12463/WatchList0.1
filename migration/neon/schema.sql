@@ -14,6 +14,7 @@ create table if not exists public.watchlists (
   name text not null check (char_length(name) between 1 and 50),
   owner_id text not null references public.profiles(id) on delete cascade,
   is_read_only boolean not null default false,
+  position integer null,
   created_at timestamptz not null default now()
 );
 

@@ -102,6 +102,15 @@ function renderLists() {
       btn.type = "button";
       btn.className = "nav-link" + (activeList?.id === list.id ? " active" : "");
 
+      if (list.access_type === "owner") {
+        const handle = document.createElement("span");
+        handle.className = "bi bi-grip-vertical drag-handle";
+        handle.title = "Drag to reorder";
+        btn.appendChild(handle);
+        item.draggable = true;
+        item.dataset.listId = String(list.id);
+      }
+
       const icon = document.createElement("span");
       icon.className = "bi bi-list-nested";
       icon.style.verticalAlign = "middle";
@@ -135,9 +144,124 @@ function renderLists() {
   });
   newItem.appendChild(newLink);
   listsEl.appendChild(newItem);
+  initListDragAndDrop(listsEl);
 }
 
-// ── List controls ─────────────────────────────────────
+// ── List nav drag-and-drop reordering ─────────────────
+async function saveListOrder(container) {
+  const ids = [...container.querySelectorAll(".nav-item[data-list-id]")]
+    .map(el => Number(el.dataset.listId));
+  // Reorder the local lists array so subsequent renderLists() calls respect the new order.
+  const reordered = ids.map(id => lists.find(l => l.id === id)).filter(Boolean);
+  const others = lists.filter(l => !ids.includes(l.id));
+  lists = [...reordered, ...others];
+  try {
+    await apiFetch("/api/lists/reorder", { method: "PATCH", body: { ids } });
+  } catch (err) {
+    showStatus(getErrorMessage(err, "Unable to save list order"), true);
+  }
+}
+
+function initListDragAndDrop(container) {
+  let dragSrc = null;
+
+  // ── Mouse drag-and-drop ──
+  container.addEventListener("dragstart", (e) => {
+    const item = e.target.closest(".nav-item[data-list-id]");
+    if (!item) return;
+    dragSrc = item;
+    item.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+  });
+
+  container.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    const target = e.target.closest(".nav-item[data-list-id]");
+    if (!target || target === dragSrc) return;
+    container.querySelectorAll(".nav-item").forEach(el =>
+      el.classList.remove("drag-over-top", "drag-over-bottom")
+    );
+    const mid = target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+    target.classList.add(e.clientY < mid ? "drag-over-top" : "drag-over-bottom");
+  });
+
+  container.addEventListener("dragleave", (e) => {
+    if (!container.contains(e.relatedTarget)) {
+      container.querySelectorAll(".nav-item").forEach(el =>
+        el.classList.remove("drag-over-top", "drag-over-bottom")
+      );
+    }
+  });
+
+  container.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const target = e.target.closest(".nav-item[data-list-id]");
+    container.querySelectorAll(".nav-item").forEach(el =>
+      el.classList.remove("drag-over-top", "drag-over-bottom", "dragging")
+    );
+    if (!target || !dragSrc || target === dragSrc) { dragSrc = null; return; }
+    const mid = target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+    if (e.clientY < mid) container.insertBefore(dragSrc, target);
+    else target.after(dragSrc);
+    dragSrc = null;
+    await saveListOrder(container);
+  });
+
+  container.addEventListener("dragend", () => {
+    container.querySelectorAll(".nav-item").forEach(el =>
+      el.classList.remove("dragging", "drag-over-top", "drag-over-bottom")
+    );
+    dragSrc = null;
+  });
+
+  // ── Touch drag-and-drop (hold drag handle to initiate) ──
+  container.addEventListener("touchstart", (e) => {
+    const handle = e.target.closest(".drag-handle");
+    if (!handle) return;
+    const item = handle.closest(".nav-item[data-list-id]");
+    if (!item) return;
+    dragSrc = item;
+    item.classList.add("dragging");
+    e.preventDefault();
+  }, { passive: false });
+
+  container.addEventListener("touchmove", (e) => {
+    if (!dragSrc) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    dragSrc.style.visibility = "hidden";
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    dragSrc.style.visibility = "";
+    const target = el?.closest(".nav-item[data-list-id]");
+    container.querySelectorAll(".nav-item").forEach(i =>
+      i.classList.remove("drag-over-top", "drag-over-bottom")
+    );
+    if (target && target !== dragSrc) {
+      const mid = target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2;
+      target.classList.add(touch.clientY < mid ? "drag-over-top" : "drag-over-bottom");
+    }
+  }, { passive: false });
+
+  container.addEventListener("touchend", async (e) => {
+    if (!dragSrc) return;
+    const touch = e.changedTouches[0];
+    dragSrc.style.visibility = "hidden";
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    dragSrc.style.visibility = "";
+    const target = el?.closest(".nav-item[data-list-id]");
+    container.querySelectorAll(".nav-item").forEach(i =>
+      i.classList.remove("drag-over-top", "drag-over-bottom", "dragging")
+    );
+    if (target && target !== dragSrc) {
+      const rect = target.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (touch.clientY < mid) container.insertBefore(dragSrc, target);
+      else target.after(dragSrc);
+      await saveListOrder(container);
+    }
+    dragSrc = null;
+  });
+}
 function configureListControls() {
   if (currentTitleEl) {
     currentTitleEl.textContent = activeList?.name ?? "";

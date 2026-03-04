@@ -393,15 +393,29 @@ app.post("/api/lists/:id/movies", async (c) => {
   const sql = db(c.env);
 
   // Block writes when the list is read-only and the requester is not the owner.
+  // For sub-lists (collections), inherit read-only from the parent list.
   // Skipped gracefully if the migration hasn't run yet (is_read_only column missing).
   try {
     const accessCheck = await sql`
       SELECT access_type, is_read_only FROM public.v_user_watchlists
       WHERE id = ${listId} AND user_id = ${userId}
     `;
-    if (!accessCheck.length) return c.json({ error: "List not found or inaccessible" }, 404);
-    if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
-      return c.json({ error: "This list is read-only" }, 403);
+    if (accessCheck.length) {
+      if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
+        return c.json({ error: "This list is read-only" }, 403);
+      }
+    } else {
+      // Possibly a sub-list — check parent list's read-only setting
+      const parentAccess = await sql`
+        select v.access_type, v.is_read_only
+        from public.watchlists wl
+        join public.v_user_watchlists v on v.id = wl.parent_list_id and v.user_id = ${userId}
+        where wl.id = ${listId}
+      `;
+      if (!parentAccess.length) return c.json({ error: "List not found or inaccessible" }, 404);
+      if (parentAccess[0].is_read_only && parentAccess[0].access_type !== "owner") {
+        return c.json({ error: "This list is read-only" }, 403);
+      }
     }
   } catch { /* migration pending — allow the write */ }
 
@@ -668,15 +682,29 @@ app.delete("/api/lists/:listId/movies/:movieId", async (c) => {
   const sql = db(c.env);
 
   // Block non-owners on read-only lists.
+  // For sub-lists (collections), inherit read-only from the parent list.
   // Skipped gracefully if the migration hasn't run yet (is_read_only column missing).
   try {
     const accessCheck = await sql`
       SELECT access_type, is_read_only FROM public.v_user_watchlists
       WHERE id = ${listId} AND user_id = ${userId}
     `;
-    if (!accessCheck.length) return c.body(null, 404);
-    if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
-      return c.json({ error: "This list is read-only" }, 403);
+    if (accessCheck.length) {
+      if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
+        return c.json({ error: "This list is read-only" }, 403);
+      }
+    } else {
+      // Possibly a sub-list — check parent list's read-only setting
+      const parentAccess = await sql`
+        select v.access_type, v.is_read_only
+        from public.watchlists wl
+        join public.v_user_watchlists v on v.id = wl.parent_list_id and v.user_id = ${userId}
+        where wl.id = ${listId}
+      `;
+      if (!parentAccess.length) return c.body(null, 404);
+      if (parentAccess[0].is_read_only && parentAccess[0].access_type !== "owner") {
+        return c.json({ error: "This list is read-only" }, 403);
+      }
     }
   } catch { /* migration pending — allow the delete */ }
 

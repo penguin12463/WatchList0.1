@@ -236,21 +236,24 @@ $$;
 
 create or replace view public.v_user_watchlists as
   select
-    w.id, w.name, w.owner_id, w.created_at, w.is_read_only,
+    w.id, w.name, w.owner_id, w.created_at,
     w.owner_id as user_id,
-    'owner'::text as access_type
+    'owner'::text as access_type,
+    w.is_read_only
   from public.watchlists w
   union all
   select
-    w.id, w.name, w.owner_id, w.created_at, w.is_read_only,
+    w.id, w.name, w.owner_id, w.created_at,
     s.user_id,
-    'shared'::text as access_type
+    'shared'::text as access_type,
+    w.is_read_only
   from public.watchlists w
   join public.watchlist_shares s on s.watchlist_id = w.id
   union all
   select
-    w.id, w.name, w.owner_id, w.created_at, w.is_read_only,
+    w.id, w.name, w.owner_id, w.created_at,
     i.user_id,
-    'invited'::text as access_type
+    'invited'::text as access_type,
+    w.is_read_only
   from public.watchlists w
   join public.watchlist_share_invitations i on i.watchlist_id = w.id;

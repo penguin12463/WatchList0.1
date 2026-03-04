@@ -153,7 +153,10 @@ function configureListControls() {
 
   welcomeScreenEl?.classList.toggle("hidden", hasListSelected);
   listContentEl?.classList.toggle("hidden", !hasListSelected);
-  addMovieForm?.classList.toggle("hidden", !hasListSelected);
+
+  // Hide the add-movie form for non-owners on read-only lists.
+  const canAdd = !activeList?.is_read_only || activeList?.access_type === 'owner';
+  addMovieForm?.classList.toggle("hidden", !hasListSelected || !canAdd);
 
   if (!hasListSelected && moviesEl) moviesEl.innerHTML = "";
 }

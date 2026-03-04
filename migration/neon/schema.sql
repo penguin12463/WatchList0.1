@@ -13,6 +13,7 @@ create table if not exists public.watchlists (
   id bigint generated always as identity primary key,
   name text not null check (char_length(name) between 1 and 50),
   owner_id text not null references public.profiles(id) on delete cascade,
+  is_read_only boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -235,29 +236,20 @@ $$;
 
 create or replace view public.v_user_watchlists as
   select
-    w.id,
-    w.name,
-    w.owner_id,
-    w.created_at,
+    w.id, w.name, w.owner_id, w.created_at, w.is_read_only,
     w.owner_id as user_id,
     'owner'::text as access_type
   from public.watchlists w
   union all
   select
-    w.id,
-    w.name,
-    w.owner_id,
-    w.created_at,
+    w.id, w.name, w.owner_id, w.created_at, w.is_read_only,
     s.user_id,
     'shared'::text as access_type
   from public.watchlists w
   join public.watchlist_shares s on s.watchlist_id = w.id
   union all
   select
-    w.id,
-    w.name,
-    w.owner_id,
-    w.created_at,
+    w.id, w.name, w.owner_id, w.created_at, w.is_read_only,
     i.user_id,
     'invited'::text as access_type
   from public.watchlists w

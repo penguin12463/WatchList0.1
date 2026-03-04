@@ -79,7 +79,7 @@ app.get("/api/lists", async (c) => {
   const sql = db(c.env);
 
   const rows = await sql`
-    select id, name, owner_id, access_type, created_at
+    select id, name, owner_id, access_type, is_read_only, created_at
     from public.v_user_watchlists
     where user_id = ${userId}
     order by created_at asc
@@ -95,7 +95,7 @@ app.get("/api/lists/:id/info", async (c) => {
   const sql = db(c.env);
 
   const rows = await sql`
-    select v.id, v.name, v.owner_id, v.access_type,
+    select v.id, v.name, v.owner_id, v.access_type, v.is_read_only,
            p.username as owner_username
     from public.v_user_watchlists v
     join public.profiles p on p.id = v.owner_id
@@ -128,19 +128,23 @@ app.post("/api/lists", async (c) => {
 app.patch("/api/lists/:id", async (c) => {
   const userId = c.get("userId");
   const listId = Number(c.req.param("id"));
-  const body = await c.req.json<{ name?: string }>();
+  const body = await c.req.json<{ name?: string; is_read_only?: boolean }>();
   const name = (body.name || "").trim().slice(0, 50);
+  const hasName = name.length > 0;
+  const hasReadOnly = typeof body.is_read_only === "boolean";
 
-  if (!name) {
-    return c.json({ error: "List name is required" }, 400);
+  if (!hasName && !hasReadOnly) {
+    return c.json({ error: "Nothing to update" }, 400);
   }
 
   const sql = db(c.env);
   const rows = await sql`
     update public.watchlists
-    set name = ${name}
+    set
+      name = case when ${hasName}::boolean then ${name}::text else name end,
+      is_read_only = case when ${hasReadOnly}::boolean then ${body.is_read_only ?? false}::boolean else is_read_only end
     where id = ${listId} and owner_id = ${userId}
-    returning id, name
+    returning id, name, is_read_only
   `;
 
   if (!rows.length) {
@@ -259,6 +263,16 @@ app.post("/api/lists/:id/movies", async (c) => {
 
   const sql = db(c.env);
 
+  // Block writes when the list is read-only and the requester is not the owner.
+  const accessCheck = await sql`
+    SELECT access_type, is_read_only FROM public.v_user_watchlists
+    WHERE id = ${listId} AND user_id = ${userId}
+  `;
+  if (!accessCheck.length) return c.json({ error: "List not found or inaccessible" }, 404);
+  if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
+    return c.json({ error: "This list is read-only" }, 403);
+  }
+
   const rows = await sql`
     select public.add_movie_to_watchlist(
       ${listId},
@@ -362,13 +376,16 @@ app.patch("/api/lists/:id/movies/reorder", async (c) => {
 
   const sql = db(c.env);
 
-  // Verify access (owner or shared — not invited)
+  // Verify access (owner or shared — not invited; and not read-only for non-owners)
   const access = await sql`
-    SELECT access_type FROM public.v_user_watchlists
+    SELECT access_type, is_read_only FROM public.v_user_watchlists
     WHERE id = ${listId} AND user_id = ${userId}
   `;
   if (!access.length || access[0].access_type === "invited") {
     return c.json({ error: "Forbidden" }, 403);
+  }
+  if (access[0].is_read_only && access[0].access_type !== "owner") {
+    return c.json({ error: "This list is read-only" }, 403);
   }
 
   // Update every movie's position in one statement via unnest
@@ -392,6 +409,16 @@ app.delete("/api/lists/:listId/movies/:movieId", async (c) => {
   const listId = Number(c.req.param("listId"));
   const movieId = Number(c.req.param("movieId"));
   const sql = db(c.env);
+
+  // Block non-owners on read-only lists.
+  const accessCheck = await sql`
+    SELECT access_type, is_read_only FROM public.v_user_watchlists
+    WHERE id = ${listId} AND user_id = ${userId}
+  `;
+  if (!accessCheck.length) return c.body(null, 404);
+  if (accessCheck[0].is_read_only && accessCheck[0].access_type !== "owner") {
+    return c.json({ error: "This list is read-only" }, 403);
+  }
 
   await sql`
     delete from public.watchlist_movies wm

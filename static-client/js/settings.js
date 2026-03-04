@@ -111,7 +111,7 @@ async function renderSettings() {
     return;
   }
 
-  const { name, access_type, owner_username } = listInfo;
+  const { name, access_type, owner_username, is_read_only } = listInfo;
   const isOwner   = access_type === "owner";
   const isShared  = access_type === "shared";
   const isInvited = access_type === "invited";
@@ -246,6 +246,50 @@ async function renderSettings() {
 
     // Load shared users
     await refreshSharedUsers(sharedUsersList);
+
+    // ─ Sharing settings box (read-only toggle) ─
+    const settingsBox = document.createElement("div");
+    settingsBox.className = "share-box";
+    settingsBox.style.marginTop = "16px";
+
+    const settingsHeading = document.createElement("h5");
+    settingsHeading.style.margin = "0 0 12px 0";
+    settingsHeading.textContent = "Sharing Settings";
+
+    const toggleWrapper = document.createElement("div");
+    toggleWrapper.className = "form-check form-switch";
+
+    const toggleInput = document.createElement("input");
+    toggleInput.type = "checkbox";
+    toggleInput.className = "form-check-input";
+    toggleInput.id = "read-only-toggle";
+    toggleInput.role = "switch";
+    toggleInput.checked = !!is_read_only;
+
+    const toggleLabel = document.createElement("label");
+    toggleLabel.className = "form-check-label";
+    toggleLabel.htmlFor = "read-only-toggle";
+    toggleLabel.textContent = "Read-only for shared users";
+
+    const toggleDesc = document.createElement("div");
+    toggleDesc.style.cssText = "font-size:0.82rem;color:#888;margin-top:6px;";
+    toggleDesc.textContent = "When enabled, shared members can view the list and update their own watch progress, but cannot add, remove, or reorder items.";
+
+    toggleWrapper.append(toggleInput, toggleLabel);
+    settingsBox.append(settingsHeading, toggleWrapper, toggleDesc);
+    centerCol.appendChild(settingsBox);
+
+    toggleInput.addEventListener("change", async () => {
+      try {
+        await apiFetch(`/api/lists/${listId}`, {
+          method: "PATCH",
+          body: { is_read_only: toggleInput.checked },
+        });
+      } catch (err) {
+        showStatus(getErrorMessage(err, "Unable to update setting"), true);
+        toggleInput.checked = !toggleInput.checked; // revert on failure
+      }
+    });
 
   } else if (isInvited) {
     // ─ Pending invitation UI ─

@@ -16,15 +16,21 @@ export function setActiveListGetter(fn) {
 // ──────────────────────────────────────────────────────
 
 export function buildMovieItem(movie) {
+  // Determine if the current user is blocked from editing this list.
+  // Owners always have full access; shared/invited users are blocked on read-only lists.
+  const _activeList = _getActiveList();
+  const isReadOnly = !!(_activeList?.is_read_only && _activeList?.access_type !== 'owner');
+
   const wrapper = document.createElement("div");
   wrapper.className = "movie-item";
-  wrapper.draggable = true;
+  wrapper.draggable = !isReadOnly;
   wrapper.dataset.movieId = String(movie.id);
 
-  // ── Drag handle (always visible in view mode) ──
+  // ── Drag handle (only shown when the user can reorder) ──
   const dragHandle = document.createElement("span");
   dragHandle.className = "bi bi-grip-vertical drag-handle";
   dragHandle.title = "Drag to reorder";
+  if (isReadOnly) dragHandle.style.display = "none";
   wrapper.appendChild(dragHandle);
 
   // ── Dot (always visible) ──
@@ -108,11 +114,13 @@ export function buildMovieItem(movie) {
   titleInput.type = "text";
   titleInput.maxLength = 80;
   titleInput.placeholder = "Title";
+  titleInput.disabled = isReadOnly;
   // no inline style — .edit-title-input CSS class (and its responsive override) handles sizing
 
   // Type select
   const typeSelect = document.createElement("select");
   typeSelect.className = "form-select edit-type-select";
+  typeSelect.disabled = isReadOnly;
   // no inline style — .edit-type-select CSS class handles sizing
   typeSelect.innerHTML =
     `<option value="">Unknown</option>` +
@@ -148,7 +156,12 @@ export function buildMovieItem(movie) {
   deleteBtn.style.cssText = "padding:0 5px;background-color:red;border-color:red;";
   deleteBtn.innerHTML = `<span class="bi bi-trash" style="vertical-align:top;color:white;"></span>`;
 
-  editDiv.append(titleInput, typeSelect, ratingSelect, saveBtn, cancelBtn, deleteBtn);
+  // Delete is not available on read-only lists for non-owners.
+  if (isReadOnly) {
+    editDiv.append(titleInput, typeSelect, ratingSelect, saveBtn, cancelBtn);
+  } else {
+    editDiv.append(titleInput, typeSelect, ratingSelect, saveBtn, cancelBtn, deleteBtn);
+  }
 
   // Watched / total numeric fields — rebuilt when type changes
   let watchedInput = null, totalInput = null;
@@ -176,6 +189,7 @@ export function buildMovieItem(movie) {
     tot.min = "1";
     tot.className = "form-control edit-num-input num-field";
     tot.placeholder = t === "movie" ? "Total min" : "Total eps";
+    tot.disabled = isReadOnly;
     // no inline style — .edit-num-input CSS class handles sizing
 
     watchedInput = w;
@@ -191,11 +205,11 @@ export function buildMovieItem(movie) {
 
   // ── Show / hide helpers ──
   const showView = () => {
-    dragHandle.style.display = "";
+    dragHandle.style.display = isReadOnly ? "none" : "";
     viewNodes.forEach(n => { n.style.display = ""; });
     editDiv.classList.add("hidden");
     editDiv.style.display = "none";
-    wrapper.draggable = true;
+    wrapper.draggable = !isReadOnly;
   };
 
   const showEdit = () => {
@@ -282,7 +296,9 @@ export function renderMovies(movies = [], moviesEl, listId) {
   const container = document.createElement("div");
   container.className = "movie-list-container";
   movies.forEach(m => container.appendChild(buildMovieItem(m)));
-  if (listId) initDragAndDrop(container, listId);
+  const _renderList = _getActiveList();
+  const canReorder = !_renderList?.is_read_only || _renderList?.access_type === 'owner';
+  if (listId && canReorder) initDragAndDrop(container, listId);
   moviesEl.appendChild(container);
 
   // On touch devices, briefly highlight the first item so users know they can tap to edit

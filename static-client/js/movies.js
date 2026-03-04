@@ -87,18 +87,7 @@ export function buildMovieItem(movie) {
   }
   viewNodes.push(metaSpan);
 
-  // Star rating (not shown for collections)
-  if (!isCollection && movie.rating >= 1 && movie.rating <= 5) {
-    const ratingSpan = document.createElement("span");
-    ratingSpan.style.cssText = "color:#000;font-size:0.95em;";
-    ratingSpan.textContent = ` - ${"★".repeat(movie.rating)}${"☆".repeat(5 - movie.rating)}`;
-    viewNodes.push(ratingSpan);
-  }
-
-  // Right-side button group — arrow (collections) then pen, grouped together at far right
-  const rightGroup = document.createElement("span");
-  rightGroup.style.cssText = "margin-left:auto;display:inline-flex;align-items:center;gap:2px;flex-shrink:0;";
-
+  // Arrow button inline after the text, collections only
   if (isCollection && movie.collection_list_id) {
     const arrowBtn = document.createElement("button");
     arrowBtn.type = "button";
@@ -111,18 +100,28 @@ export function buildMovieItem(movie) {
         window.selectCollection(movie.collection_list_id);
       }
     });
-    rightGroup.appendChild(arrowBtn);
+    viewNodes.push(arrowBtn);
   }
 
-  // Edit button — hidden entirely for non-owners on read-only lists
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.className = "movie-item-edit-btn";
-  editBtn.innerHTML =
-    `<span class="bi bi-pen-fill" style="vertical-align:top;scale:1;color:#60a5fa;"></span>`;
-  if (!isReadOnly) rightGroup.appendChild(editBtn);
+  // Star rating (not shown for collections)
+  if (!isCollection && movie.rating >= 1 && movie.rating <= 5) {
+    const ratingSpan = document.createElement("span");
+    ratingSpan.style.cssText = "color:#000;font-size:0.95em;";
+    ratingSpan.textContent = ` - ${"★".repeat(movie.rating)}${"☆".repeat(5 - movie.rating)}`;
+    viewNodes.push(ratingSpan);
+  }
 
-  if (rightGroup.children.length) viewNodes.push(rightGroup);
+  // Edit button — at the far right, hidden entirely for non-owners on read-only lists
+  let editBtn = null;
+  if (!isReadOnly) {
+    editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "movie-item-edit-btn";
+    editBtn.style.cssText = "margin-left:auto;flex-shrink:0;";
+    editBtn.innerHTML =
+      `<span class="bi bi-pen-fill" style="vertical-align:top;scale:1;color:#60a5fa;"></span>`;
+    viewNodes.push(editBtn);
+  }
 
   viewNodes.forEach(n => wrapper.appendChild(n));
 
@@ -267,7 +266,7 @@ export function buildMovieItem(movie) {
   };
 
   // ── Wire events ──
-  editBtn.addEventListener("click", showEdit);
+  if (editBtn) editBtn.addEventListener("click", showEdit);
   cancelBtn.addEventListener("click", showView);
 
   saveBtn.addEventListener("click", async () => {

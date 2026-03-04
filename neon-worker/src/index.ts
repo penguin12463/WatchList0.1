@@ -687,6 +687,17 @@ app.delete("/api/lists/:listId/movies/:movieId", async (c) => {
       and public.is_watchlist_accessible(${listId}, ${userId})
   `;
 
+  // If the movie was a collection, delete its sub-watchlist too so it disappears from the nav.
+  try {
+    const collRow = await sql`
+      SELECT collection_list_id FROM public.movies WHERE id = ${movieId}
+    `;
+    const collListId = collRow[0]?.collection_list_id;
+    if (collListId) {
+      await sql`DELETE FROM public.watchlists WHERE id = ${collListId}`;
+    }
+  } catch { /* non-fatal */ }
+
   return c.body(null, 204);
 });
 

@@ -2,6 +2,11 @@
 -- Adds support for Collection items: a movie row can reference a sub-watchlist,
 -- and a watchlist can reference its parent watchlist.
 
+-- Extend the media_type check constraint to allow 'collection'
+ALTER TABLE public.movies DROP CONSTRAINT IF EXISTS movies_media_type_check;
+ALTER TABLE public.movies ADD CONSTRAINT movies_media_type_check
+  CHECK (media_type IN ('movie', 'tv', 'collection'));
+
 -- Sub-watchlist link on watchlists: if this is a collection sub-list, parent_list_id is set.
 -- ON DELETE CASCADE ensures deleting the parent list also removes its sub-lists.
 ALTER TABLE public.watchlists

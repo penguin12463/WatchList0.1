@@ -133,6 +133,27 @@
   text-shadow: -1px 0 #000, 0 1px #000, 1px 0 #000, 0 -1px #000;
 }
 
+/* Collection arrow button — navigates into the sub-list */
+.movie-item-collection-btn {
+  margin-left: auto;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer;
+  padding: 0.15rem 0.3rem;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  opacity: 0.5;
+  transition: opacity 120ms ease-in-out;
+}
+.movie-item:hover .movie-item-collection-btn {
+  opacity: 1;
+}
+.movie-item-collection-btn .bi-arrow-right-circle-fill {
+  font-size: 1.1rem;
+  color: #60a5fa;
+}
+
 /* ════════════════════════
    Edit mode row
 ════════════════════════ */

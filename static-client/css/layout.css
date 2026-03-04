@@ -209,6 +209,37 @@ main {
   border-bottom: 2px solid #60a5fa;
 }
 
+/* Sub-list (collection) nav items — indented below their parent */
+.nav-sub-item {
+  margin-bottom: 0.1rem;
+  padding-left: 1.5rem;
+}
+.nav-sub-item .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  color: #b0b8cc;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  min-height: 2.2rem;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.nav-sub-item .nav-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.nav-sub-item .nav-link.active {
+  background: rgba(96, 165, 250, 0.2);
+  color: #fff;
+}
+
 /* Pending invite clock icon (yellow) */
 .pending-clock-icon {
   color: #fef08a;

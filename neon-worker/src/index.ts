@@ -84,6 +84,7 @@ app.get("/api/lists", async (c) => {
     rows = await sql`
       select v.id, v.name, v.owner_id, v.access_type, v.is_read_only, v.created_at
       from public.v_user_watchlists v
+      join public.watchlists wl on wl.id = v.id and wl.parent_list_id is null
       left join public.user_list_positions ulp
         on ulp.watchlist_id = v.id and ulp.user_id = ${userId}
       where v.user_id = ${userId}
@@ -231,6 +232,40 @@ app.delete("/api/lists/:id", async (c) => {
   return c.body(null, 204);
 });
 
+app.get("/api/lists/:id/sub-lists", async (c) => {
+  const userId = c.get("userId");
+  const listId = Number(c.req.param("id"));
+  const sql = db(c.env);
+
+  // Verify caller has access to the parent list
+  try {
+    const access = await sql`
+      select 1 from public.v_user_watchlists
+      where id = ${listId} and user_id = ${userId}
+    `;
+    if (!access.length) return c.json({ error: "List not found or inaccessible" }, 404);
+  } catch {
+    return c.json([], 200);
+  }
+
+  // Return sub-lists belonging to this parent
+  try {
+    const rows = await sql`
+      select w.id, w.name, w.owner_id, w.parent_list_id, w.created_at,
+             case when w.owner_id = ${userId} then 'owner' else 'shared' end as access_type,
+             coalesce(pw.is_read_only, false) as is_read_only
+      from public.watchlists w
+      left join public.watchlists pw on pw.id = w.parent_list_id
+      where w.parent_list_id = ${listId}
+      order by w.created_at asc
+    `;
+    return c.json(rows);
+  } catch {
+    // parent_list_id column not yet migrated
+    return c.json([], 200);
+  }
+});
+
 app.get("/api/lists/:id/movies", async (c) => {
   const userId = c.get("userId");
   const listId = Number(c.req.param("id"));
@@ -241,14 +276,21 @@ app.get("/api/lists/:id/movies", async (c) => {
   try {
     rows = await sql`
       select m.id, m.title, m.media_type, m.tmdb_id, m.runtime, m.number_of_episodes,
-             m.created_by, m.created_at,
+             m.created_by, m.created_at, m.collection_list_id,
              mp.watched_runtime, mp.watched_episodes, mp.rating
       from public.watchlist_movies wm
       join public.movies m on m.id = wm.movie_id
       left join public.movie_progress mp
         on mp.movie_id = m.id and mp.watchlist_id = ${listId}
       where wm.watchlist_id = ${listId}
-        and public.is_watchlist_accessible(${listId}, ${userId})
+        and (
+          public.is_watchlist_accessible(${listId}, ${userId})
+          or exists (
+            select 1 from public.watchlists wl
+            where wl.id = ${listId} and wl.parent_list_id is not null
+              and public.is_watchlist_accessible(wl.parent_list_id, ${userId})
+          )
+        )
       order by wm.position asc, wm.created_at asc
     `;
   } catch {
@@ -418,11 +460,37 @@ app.patch("/api/movies/:id", async (c) => {
       `;
       if (access.length) {
         canEditShared = !access[0].is_read_only || access[0].access_type === "owner";
+      } else {
+        // Possibly a sub-list — check parent list's read-only setting
+        try {
+          const parentAccess = await sql`
+            select v.access_type, v.is_read_only
+            from public.watchlists wl
+            join public.v_user_watchlists v on v.id = wl.parent_list_id and v.user_id = ${userId}
+            where wl.id = ${body.list_id}
+          `;
+          if (parentAccess.length) {
+            canEditShared = !parentAccess[0].is_read_only || parentAccess[0].access_type === "owner";
+          }
+        } catch { /* parent_list_id not yet migrated */ }
       }
     } catch {
       // is_read_only migration not yet applied — allow edit (safe default).
     }
   }
+
+  // Fetch current movie state for collection type transition handling.
+  let prevMediaType: string | null = null;
+  let prevCollectionListId: number | null = null;
+  try {
+    const prevRows = await sql`
+      select media_type, collection_list_id from public.movies where id = ${movieId}
+    `;
+    if (prevRows.length) {
+      prevMediaType = prevRows[0].media_type ?? null;
+      prevCollectionListId = prevRows[0].collection_list_id ?? null;
+    }
+  } catch { /* collection_list_id column may not exist yet */ }
 
   if (canEditShared) {
     // Update shared movie metadata (title, type, total runtime/episodes) on the movies table.
@@ -444,6 +512,35 @@ app.patch("/api/movies/:id", async (c) => {
     `;
     if (!movieRows.length) {
       return c.json({ error: "Movie not found or inaccessible" }, 404);
+    }
+
+    // Handle collection type transitions.
+    const newMediaType = body.media_type !== undefined ? (body.media_type ?? null) : prevMediaType;
+    if (newMediaType === 'collection') {
+      try {
+        if (!prevCollectionListId && body.list_id) {
+          // Create sub-watchlist for this collection item
+          const collectionName = (body.title ?? '').trim() || 'Collection';
+          const newList = await sql`
+            insert into public.watchlists (name, owner_id, parent_list_id)
+            values (${collectionName}, ${userId}, ${body.list_id})
+            returning id
+          `;
+          await sql`update public.movies set collection_list_id = ${newList[0].id} where id = ${movieId}`;
+        } else if (prevCollectionListId) {
+          // Rename sub-watchlist to match the new title
+          const collectionName = (body.title ?? '').trim();
+          if (collectionName) {
+            await sql`update public.watchlists set name = ${collectionName} where id = ${prevCollectionListId}`;
+          }
+        }
+      } catch { /* collection columns not yet migrated */ }
+    } else if (prevMediaType === 'collection' && prevCollectionListId) {
+      // Switching away from collection — delete the sub-watchlist (cascade removes its movies)
+      try {
+        await sql`delete from public.watchlists where id = ${prevCollectionListId}`;
+        await sql`update public.movies set collection_list_id = null where id = ${movieId}`;
+      } catch { /* collection columns not yet migrated */ }
     }
   } else {
     // Read-only list: verify access without updating shared fields.
@@ -489,6 +586,7 @@ app.patch("/api/movies/:id", async (c) => {
   try {
     const rows = await sql`
       select m.id, m.title, m.media_type, m.runtime, m.number_of_episodes,
+             m.collection_list_id,
              mp.watched_runtime, mp.watched_episodes, mp.rating
       from public.movies m
       left join public.movie_progress mp

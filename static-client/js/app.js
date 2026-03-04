@@ -33,6 +33,8 @@ const tmdbResultsEl     = document.getElementById("tmdb-results");
 let clerk           = null;
 let lists           = [];
 let activeList      = null;
+let activeParentList = null;
+let activeSubLists   = [];
 let appInitialized  = false;
 let tmdbSelected    = null;
 
@@ -100,7 +102,7 @@ function renderLists() {
       // Owner or shared — select list in-place
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "nav-link" + (activeList?.id === list.id ? " active" : "");
+      btn.className = "nav-link" + (activeParentList?.id === list.id ? " active" : "");
 
       const icon = document.createElement("span");
       icon.className = "bi bi-list-nested";
@@ -118,6 +120,24 @@ function renderLists() {
     }
 
     listsEl.appendChild(item);
+
+    // Show sub-lists (collections) below the active parent list item
+    if (activeParentList?.id === list.id && activeSubLists.length) {
+      for (const sub of activeSubLists) {
+        const subItem = document.createElement("div");
+        subItem.className = "nav-sub-item";
+        const subBtn = document.createElement("button");
+        subBtn.type = "button";
+        subBtn.className = "nav-link" + (activeList?.id === sub.id ? " active" : "");
+        const subIcon = document.createElement("span");
+        subIcon.className = "bi bi-collection-fill";
+        subIcon.style.verticalAlign = "middle";
+        subBtn.append(subIcon, ` ${sub.name}`);
+        subBtn.addEventListener("click", () => selectCollection(sub.id));
+        subItem.appendChild(subBtn);
+        listsEl.appendChild(subItem);
+      }
+    }
   }
 
   // "New List" nav item — creates immediately and navigates to settings for naming
@@ -265,8 +285,9 @@ function configureListControls() {
   }
 
   if (settingsLinkEl) {
-    settingsLinkEl.href = activeList
-      ? `./settings.html?listId=${activeList.id}`
+    const settingsListId = activeParentList?.id ?? activeList?.id;
+    settingsLinkEl.href = settingsListId
+      ? `./settings.html?listId=${settingsListId}`
       : "./settings.html";
   }
 
@@ -295,6 +316,8 @@ function showWelcomeScreen(hasList) {
 // ── List selection ────────────────────────────────────
 async function selectList(list) {
   activeList = list;
+  activeParentList = list;
+  activeSubLists = [];
   closeMobileNav();  // close nav drawer on mobile when a list is picked
   renderLists();
   configureListControls();
@@ -303,6 +326,12 @@ async function selectList(list) {
   try {
     await loadMovies(list.id, moviesEl);
     hideTmdbResults();
+    // Fetch sub-lists (collections) for this list
+    try {
+      const subs = await apiFetch(`/api/lists/${list.id}/sub-lists`);
+      activeSubLists = Array.isArray(subs) ? subs : [];
+      if (activeSubLists.length) renderLists();
+    } catch { activeSubLists = []; }
   } catch (err) {
     const msg = getErrorMessage(err).toLowerCase();
     if (msg.includes("unauthorized") && !clerk.user) {
@@ -312,6 +341,23 @@ async function selectList(list) {
     showStatus(getErrorMessage(err, "Unable to load list"), true);
   }
 }
+
+async function selectCollection(collectionListId) {
+  const subList = activeSubLists.find(s => s.id === collectionListId);
+  if (!subList) return;
+  activeList = subList;
+  // activeParentList remains unchanged (the top-level list)
+  closeMobileNav();
+  renderLists();
+  configureListControls();
+  try {
+    await loadMovies(subList.id, moviesEl);
+    hideTmdbResults();
+  } catch (err) {
+    showStatus(getErrorMessage(err, "Unable to load collection"), true);
+  }
+}
+window.selectCollection = selectCollection;
 
 async function loadLists(preferredListId = null) {
   const rows = await apiFetch("/api/lists");

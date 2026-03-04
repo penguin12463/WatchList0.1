@@ -52,10 +52,18 @@ export function buildMovieItem(movie) {
   // Media-type meta  ("- [icon] - X/Y min" etc.)
   const metaSpan = document.createElement("span");
   metaSpan.style.cssText = "color:#000;font-size:0.95em;";
-  const isTV    = movie.media_type === "tv";
-  const isMovie = movie.media_type === "movie";
+  const isTV         = movie.media_type === "tv";
+  const isMovie      = movie.media_type === "movie";
+  const isCollection = movie.media_type === "collection";
 
-  if (isMovie || isTV) {
+  if (isCollection) {
+    // Collections show a folder icon — no progress/length info
+    const icon = document.createElement("span");
+    icon.className = "bi bi-collection-fill";
+    icon.style.cssText = "vertical-align:middle;color:#60a5fa;";
+    metaSpan.append(" - ");
+    metaSpan.appendChild(icon);
+  } else if (isMovie || isTV) {
     const icon = document.createElement("img");
     icon.src = isTV ? "./images/episodes.png" : "./images/clapperboard.png";
     icon.loading = "lazy";
@@ -82,12 +90,28 @@ export function buildMovieItem(movie) {
   }
   viewNodes.push(metaSpan);
 
-  // Star rating
-  if (movie.rating >= 1 && movie.rating <= 5) {
+  // Star rating (not shown for collections)
+  if (!isCollection && movie.rating >= 1 && movie.rating <= 5) {
     const ratingSpan = document.createElement("span");
     ratingSpan.style.cssText = "color:#000;font-size:0.95em;";
     ratingSpan.textContent = ` - ${"★".repeat(movie.rating)}${"☆".repeat(5 - movie.rating)}`;
     viewNodes.push(ratingSpan);
+  }
+
+  // Arrow button for collection items — navigates to the sub-list
+  if (isCollection && movie.collection_list_id) {
+    const arrowBtn = document.createElement("button");
+    arrowBtn.type = "button";
+    arrowBtn.className = "movie-item-collection-btn";
+    arrowBtn.title = "Open collection";
+    arrowBtn.innerHTML = `<span class="bi bi-arrow-right-circle-fill" style="vertical-align:top;color:#60a5fa;"></span>`;
+    arrowBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (typeof window.selectCollection === "function") {
+        window.selectCollection(movie.collection_list_id);
+      }
+    });
+    viewNodes.push(arrowBtn);
   }
 
   // Edit button — hidden entirely for non-owners on read-only lists
@@ -125,7 +149,8 @@ export function buildMovieItem(movie) {
   typeSelect.innerHTML =
     `<option value="">Unknown</option>` +
     `<option value="movie">Movie</option>` +
-    `<option value="tv">TV</option>`;
+    `<option value="tv">TV</option>` +
+    `<option value="collection">Collection</option>`;
 
   // Rating select
   const ratingSelect = document.createElement("select");
@@ -201,7 +226,11 @@ export function buildMovieItem(movie) {
     editDiv.insertBefore(tot, ratingSelect);
   };
 
-  typeSelect.addEventListener("change", rebuildNumericFields);
+  typeSelect.addEventListener("change", () => {
+    rebuildNumericFields();
+    // Hide rating for collection type (collections don't have star ratings)
+    ratingSelect.style.display = typeSelect.value === "collection" ? "none" : "";
+  });
 
   // ── Show / hide helpers ──
   const showView = () => {
@@ -218,6 +247,7 @@ export function buildMovieItem(movie) {
     titleInput.value = movie.title;
     typeSelect.value = movie.media_type || "";
     ratingSelect.value = movie.rating != null ? String(movie.rating) : "";
+    ratingSelect.style.display = typeSelect.value === "collection" ? "none" : "";
     rebuildNumericFields();
     if (watchedInput) {
       watchedInput.value = isTV

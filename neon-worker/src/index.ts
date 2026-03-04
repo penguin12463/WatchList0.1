@@ -277,6 +277,7 @@ app.get("/api/lists/:id/movies", async (c) => {
     rows = await sql`
       select m.id, m.title, m.media_type, m.tmdb_id, m.runtime, m.number_of_episodes,
              m.created_by, m.created_at, m.collection_list_id,
+             (select count(*) from public.watchlist_movies wm2 where wm2.watchlist_id = m.collection_list_id) as collection_item_count,
              mp.watched_runtime, mp.watched_episodes, mp.rating
       from public.watchlist_movies wm
       join public.movies m on m.id = wm.movie_id

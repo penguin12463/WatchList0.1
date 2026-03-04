@@ -57,12 +57,9 @@ export function buildMovieItem(movie) {
   const isCollection = movie.media_type === "collection";
 
   if (isCollection) {
-    // Collections show a folder icon — no progress/length info
-    const icon = document.createElement("span");
-    icon.className = "bi bi-collection-fill";
-    icon.style.cssText = "vertical-align:middle;color:#60a5fa;";
-    metaSpan.append(" - ");
-    metaSpan.appendChild(icon);
+    // Collections show item count
+    const count = movie.collection_item_count ?? 0;
+    metaSpan.append(` - ${count} item${count === 1 ? '' : 's'}`);
   } else if (isMovie || isTV) {
     const icon = document.createElement("img");
     icon.src = isTV ? "./images/episodes.png" : "./images/clapperboard.png";

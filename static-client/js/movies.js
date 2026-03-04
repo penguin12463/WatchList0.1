@@ -95,7 +95,10 @@ export function buildMovieItem(movie) {
     viewNodes.push(ratingSpan);
   }
 
-  // Arrow button for collection items — navigates to the sub-list
+  // Right-side button group — arrow (collections) + edit pen, grouped together at far right
+  const rightGroup = document.createElement("span");
+  rightGroup.style.cssText = "margin-left:auto;display:inline-flex;align-items:center;gap:2px;flex-shrink:0;";
+
   if (isCollection && movie.collection_list_id) {
     const arrowBtn = document.createElement("button");
     arrowBtn.type = "button";
@@ -108,7 +111,7 @@ export function buildMovieItem(movie) {
         window.selectCollection(movie.collection_list_id);
       }
     });
-    viewNodes.push(arrowBtn);
+    rightGroup.appendChild(arrowBtn);
   }
 
   // Edit button — hidden entirely for non-owners on read-only lists
@@ -118,7 +121,9 @@ export function buildMovieItem(movie) {
   editBtn.innerHTML =
     `<span class="bi bi-pen-fill" style="vertical-align:top;scale:1;` +
     `color:#60a5fa;text-shadow:-1px 0 #000,0 1px #000,1px 0 #000,0 -1px #000;"></span>`;
-  if (!isReadOnly) viewNodes.push(editBtn);
+  if (!isReadOnly) rightGroup.appendChild(editBtn);
+
+  if (rightGroup.children.length) viewNodes.push(rightGroup);
 
   viewNodes.forEach(n => wrapper.appendChild(n));
 

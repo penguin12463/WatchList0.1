@@ -8,11 +8,13 @@ let _titleInput = null;
 let _resultsEl  = null;
 let _onSelect   = null;    // callback(selectedData)
 let _searchTimer = null;
+let _getTypeFilter = () => "";  // returns current type filter value
 
-export function initTmdbSearch(titleInputEl, resultsEl, onSelectCallback) {
+export function initTmdbSearch(titleInputEl, resultsEl, onSelectCallback, getTypeFilter) {
   _titleInput = titleInputEl;
   _resultsEl  = resultsEl;
   _onSelect   = onSelectCallback;
+  if (getTypeFilter) _getTypeFilter = getTypeFilter;
 
   if (!_titleInput) return;
 
@@ -42,9 +44,16 @@ function _hide() {
 
 async function _doSearch(query) {
   if (!query || query.length < 2) { _hide(); return; }
+  const typeFilter = _getTypeFilter();
+  // Collections are user-named — no TMDB search
+  if (typeFilter === "collection") { _hide(); return; }
   try {
     const data = await apiFetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
-    const results = data?.results || [];
+    let results = data?.results || [];
+    // Filter to selected type when one is specified
+    if (typeFilter === "movie" || typeFilter === "tv") {
+      results = results.filter(r => r.media_type === typeFilter);
+    }
     const metaSpans = _show(results);
 
     // Fetch detail for each result in parallel to get runtimes

@@ -27,6 +27,7 @@ const welcomeSubEl      = document.getElementById("welcome-sub");
 const listContentEl     = document.getElementById("list-content");
 const addMovieForm      = document.getElementById("add-movie-form");
 const movieTitleInput   = document.getElementById("movie-title-input");
+const addTypeSelectEl   = document.getElementById("add-type-select");
 const tmdbResultsEl     = document.getElementById("tmdb-results");
 
 // ── State ─────────────────────────────────────────────
@@ -432,10 +433,10 @@ async function initAppPage() {  // Remove initial loading placeholder as soon as
     window.location.href = "./";
   });
 
-  // TMDB autocomplete
+  // TMDB autocomplete — pass type filter getter so results are filtered by selected type
   initTmdbSearch(movieTitleInput, tmdbResultsEl, (data) => {
     tmdbSelected = data;
-  });
+  }, () => addTypeSelectEl?.value || "");
 
   // Add-movie form
   addMovieForm?.addEventListener("submit", async (e) => {
@@ -443,20 +444,42 @@ async function initAppPage() {  // Remove initial loading placeholder as soon as
     if (!activeList) return;
     const typedTitle = (movieTitleInput?.value || "").trim();
     if (!typedTitle) return;
+    const selectedType = addTypeSelectEl?.value || "";
 
-    const body = (tmdbSelected && tmdbSelected.title === typedTitle)
-      ? { ...tmdbSelected }
-      : { title: typedTitle };
+    // Collections are user-named — skip TMDB data entirely
+    let body;
+    if (selectedType === "collection") {
+      body = { title: typedTitle, media_type: "collection" };
+    } else if (tmdbSelected && tmdbSelected.title === typedTitle) {
+      body = { ...tmdbSelected };
+      // Override type if user explicitly selected one
+      if (selectedType) body.media_type = selectedType;
+    } else {
+      body = { title: typedTitle };
+      if (selectedType) body.media_type = selectedType;
+    }
 
     try {
-      await apiFetch(`/api/lists/${activeList.id}/movies`, {
+      const result = await apiFetch(`/api/lists/${activeList.id}/movies`, {
         method: "POST",
         body,
       });
       if (movieTitleInput) movieTitleInput.value = "";
       tmdbSelected = null;
       hideTmdbResults();
+
+      // If collection type: immediately PATCH the new item to auto-create its sub-watchlist
+      if (selectedType === "collection" && result?.movie_id) {
+        try {
+          await apiFetch(`/api/movies/${result.movie_id}`, {
+            method: "PATCH",
+            body: { list_id: activeList.id, media_type: "collection", title: typedTitle },
+          });
+        } catch { /* sub-list creation is best-effort */ }
+      }
+
       await loadMovies(activeList.id, moviesEl);
+      if (selectedType === "collection") window.refreshSubLists?.();
     } catch (err) {
       showStatus(getErrorMessage(err, "Unable to add title"), true);
     }
@@ -466,6 +489,19 @@ async function initAppPage() {  // Remove initial loading placeholder as soon as
   movieTitleInput?.addEventListener("input", () => {
     const q = (movieTitleInput.value || "").trim();
     if (tmdbSelected && tmdbSelected.title !== q) tmdbSelected = null;
+  });
+
+  // Update placeholder and hide results when type changes
+  addTypeSelectEl?.addEventListener("change", () => {
+    const t = addTypeSelectEl.value;
+    if (movieTitleInput) {
+      movieTitleInput.placeholder =
+        t === "collection" ? "Collection name..." :
+        t === "movie"      ? "Search movies..." :
+        t === "tv"         ? "Search TV shows..." :
+                             "Add a title...";
+    }
+    if (t === "collection") hideTmdbResults();
   });
 
   // Load profile + lists

@@ -89,7 +89,13 @@
               <form id="add-movie-form" class="add-movie-form hidden">
                 <div class="add-movie-row">
                   <button type="submit" class="btn btn-primary" style="padding:0.25rem 0.5rem;"><span class="bi bi-plus-circle-fill" style="vertical-align:top;"></span></button>
-                  <input id="movie-title-input" type="text" class="form-control" placeholder="Add a movie..." maxlength="120" required autocomplete="off" style="flex:1 1 0%;min-width:0;" />
+                  <select id="add-type-select" class="form-select" style="width:auto;flex-shrink:0;">
+                    <option value="">Any</option>
+                    <option value="movie">Movie</option>
+                    <option value="tv">TV Show</option>
+                    <option value="collection">Collection</option>
+                  </select>
+                  <input id="movie-title-input" type="text" class="form-control" placeholder="Add a title..." maxlength="120" required autocomplete="off" style="flex:1 1 0%;min-width:0;" />
                 </div>
               </form>
 

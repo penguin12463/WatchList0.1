@@ -320,6 +320,15 @@ function configureListControls() {
         addTypeSelectEl.appendChild(opt);
       }
     }
+    // Sync placeholder to current select value (in case value was reset without firing change)
+    if (movieTitleInput) {
+      const t = addTypeSelectEl.value;
+      movieTitleInput.placeholder =
+        t === "collection" ? "Collection name..." :
+        t === "movie"      ? "Search movies..." :
+        t === "tv"         ? "Search TV shows..." :
+                             "Add a title...";
+    }
   }
 
   const hasListSelected = !!activeList;

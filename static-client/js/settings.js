@@ -273,7 +273,7 @@ async function renderSettings() {
 
     const toggleDesc = document.createElement("div");
     toggleDesc.style.cssText = "font-size:0.82rem;color:#888;margin-top:6px;";
-    toggleDesc.textContent = "When enabled, shared members can view the list and update their own watch progress, but cannot add, remove, or reorder items.";
+    toggleDesc.textContent = "When enabled, shared members can only view the list. Only the owner can add, remove, reorder items, or update watch progress and ratings.";
 
     toggleWrapper.append(toggleInput, toggleLabel);
     settingsBox.append(settingsHeading, toggleWrapper, toggleDesc);

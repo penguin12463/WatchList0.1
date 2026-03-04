@@ -131,7 +131,7 @@ function renderLists() {
         subBtn.type = "button";
         subBtn.className = "nav-link" + (activeList?.id === sub.id ? " active" : "");
         const subIcon = document.createElement("span");
-        subIcon.className = "bi bi-collection-fill";
+        subIcon.className = "bi bi-arrow-return-right";
         subIcon.style.verticalAlign = "middle";
         subBtn.append(subIcon, ` ${sub.name}`);
         subBtn.addEventListener("click", () => selectCollection(sub.id));

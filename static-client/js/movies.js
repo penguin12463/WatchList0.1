@@ -104,7 +104,7 @@ export function buildMovieItem(movie) {
     arrowBtn.type = "button";
     arrowBtn.className = "movie-item-collection-btn";
     arrowBtn.title = "Open collection";
-    arrowBtn.innerHTML = `<span class="bi bi-arrow-right-circle-fill" style="vertical-align:top;color:#60a5fa;"></span>`;
+    arrowBtn.innerHTML = `<span class="bi bi-arrow-right-circle-fill" style="vertical-align:top;color:#60a5fa;text-shadow:-1px 0 #000,0 1px #000,1px 0 #000,0 -1px #000;"></span>`;
     arrowBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (typeof window.selectCollection === "function") {

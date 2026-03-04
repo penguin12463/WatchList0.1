@@ -285,10 +285,16 @@ function configureListControls() {
   }
 
   if (settingsLinkEl) {
-    const settingsListId = activeParentList?.id ?? activeList?.id;
-    settingsLinkEl.href = settingsListId
-      ? `./settings.html?listId=${settingsListId}`
-      : "./settings.html";
+    const isSubList = activeList && activeParentList && activeList.id !== activeParentList.id;
+    if (isSubList) {
+      settingsLinkEl.style.display = "none";
+    } else {
+      settingsLinkEl.style.display = "";
+      const settingsListId = activeParentList?.id ?? activeList?.id;
+      settingsLinkEl.href = settingsListId
+        ? `./settings.html?listId=${settingsListId}`
+        : "./settings.html";
+    }
   }
 
   const hasListSelected = !!activeList;

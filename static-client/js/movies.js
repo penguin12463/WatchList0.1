@@ -93,7 +93,7 @@ export function buildMovieItem(movie) {
     arrowBtn.type = "button";
     arrowBtn.className = "movie-item-collection-btn";
     arrowBtn.title = "Open collection";
-    arrowBtn.innerHTML = `<span class="bi bi-arrow-right-circle-fill" style="vertical-align:top;color:#60a5fa;"></span>`;
+    arrowBtn.innerHTML = `<span class="bi bi-arrow-right-circle-fill" style="vertical-align:top;color:#000;"></span>`;
     arrowBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (typeof window.selectCollection === "function") {
@@ -146,11 +146,12 @@ export function buildMovieItem(movie) {
   typeSelect.className = "form-select edit-type-select";
   typeSelect.disabled = isReadOnly;
   // no inline style — .edit-type-select CSS class handles sizing
+  const inSubList = typeof window.isSubListView === "function" && window.isSubListView();
   typeSelect.innerHTML =
     `<option value="">Unknown</option>` +
     `<option value="movie">Movie</option>` +
     `<option value="tv">TV</option>` +
-    `<option value="collection">Collection</option>`;
+    (inSubList ? "" : `<option value="collection">Collection</option>`);
 
   // Rating select
   const ratingSelect = document.createElement("select");

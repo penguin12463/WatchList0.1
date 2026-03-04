@@ -285,17 +285,27 @@ function configureListControls() {
     currentTitleEl.textContent = activeList?.name ?? "";
   }
 
+  const isSubList = !!(activeList && activeParentList && activeList.id !== activeParentList.id);
+  window.isSubListView = () => isSubList;
+
   if (settingsLinkEl) {
-    const isSubList = activeList && activeParentList && activeList.id !== activeParentList.id;
     if (isSubList) {
-      settingsLinkEl.style.display = "none";
+      // visibility:hidden (not display:none) so the grid column keeps its width and title stays centred
+      settingsLinkEl.style.visibility = "hidden";
     } else {
-      settingsLinkEl.style.display = "";
+      settingsLinkEl.style.visibility = "";
       const settingsListId = activeParentList?.id ?? activeList?.id;
       settingsLinkEl.href = settingsListId
         ? `./settings.html?listId=${settingsListId}`
         : "./settings.html";
     }
+  }
+
+  // Hide "Collection" option from add-type-select when inside a collection sub-list
+  if (addTypeSelectEl) {
+    const collectionOption = addTypeSelectEl.querySelector('option[value="collection"]');
+    if (collectionOption) collectionOption.style.display = isSubList ? "none" : "";
+    if (isSubList && addTypeSelectEl.value === "collection") addTypeSelectEl.value = "";
   }
 
   const hasListSelected = !!activeList;
